@@ -1,39 +1,68 @@
-// riscvsingle.sv
-// RISC-V single-cycle processor
-// David_Harris@hmc.edu 2020
+// alu.sv
+// RISC-V single-cycle ALU
 
 module alu(
-        input   logic [31:0]    SrcA, SrcB,
-        input   logic [1:0]     ALUControl,
-        input   logic [2:0]     Funct3,
-        output  logic [31:0]    ALUResult, IEUAdr
-    );
+    input  logic [31:0] SrcA, SrcB,
+    input  logic [4:0]  ALUControl,
+    output logic [31:0] ALUResult, IEUAdr
+);
 
-    logic [31:0] CondInvb, Sum, SLT;
-    logic ALUOp, Sub, Overflow, Neg, LT;
-    logic [2:0] ALUFunct;
+    // Adder / Subtractor
+    logic        Sub;
+    logic [31:0] CondInvB, Sum;
 
-    assign {Sub, ALUOp} = ALUControl;
+    assign Sub = (ALUControl == 5'b00001) | // SUB
+             (ALUControl == 5'b00011) | // SLT
+             (ALUControl == 5'b00100);  // SLTU
 
-    // Add or subtract
-    assign CondInvb = Sub ? ~SrcB : SrcB;
-    assign Sum = SrcA + CondInvb + {{(31){1'b0}}, Sub};
-    assign IEUAdr = Sum; // Send this out to IFU and LSU
+    assign CondInvB = Sub ? ~SrcB : SrcB;
+    assign Sum      = SrcA + CondInvB + {31'b0, Sub};
+    assign IEUAdr   = Sum;
 
-    // Set less than based on subtraction result
-    assign Overflow = (SrcA[31] ^ SrcB[31]) & (SrcA[31] ^ Sum[31]);
-    assign Neg = Sum[31];
-    assign LT = Neg ^ Overflow;
-    assign SLT = {31'b0, LT};
-    assign ALUFunct = Funct3 & {3{ALUOp}}; // Force ALUFunct to 0 to Add when ALUOp = 0
+    // Signed less-than (SLT) — overflow-aware
+    logic Overflow, Neg, LT;
 
+    assign Overflow = (~(SrcA[31] ^ SrcB[31] ^ Sub)) & (SrcA[31] ^ Sum[31]);
+    assign Neg      = Sum[31];
+    assign LT       = Neg ^ Overflow;
+
+    // Shift amount — bottom 5 bits of SrcB (rs2 or shamt immediate)
+    logic [4:0] Shamt;
+    assign Shamt = SrcB[4:0];
+
+    //multiply logic
+    logic [63:0]        mul_unsigned;
+    logic signed [63:0] mul_signed;
+    logic signed [63:0] mul_mixed;
+
+    assign mul_unsigned = {32'b0, SrcA} * {32'b0, SrcB};
+    assign mul_signed   = $signed({{32{SrcA[31]}}, SrcA}) * $signed({{32{SrcB[31]}}, SrcB});
+    assign mul_mixed    = $signed({{32{SrcA[31]}}, SrcA}) * $signed({32'b0, SrcB});
+
+    // Result mux
     always_comb begin
-        case (ALUFunct)
-            3'b000: ALUResult = Sum; // add or sub
-            3'b010: ALUResult = SLT; // slt
-            3'b110: ALUResult = SrcA | SrcB; // or
-            3'b111: ALUResult = SrcA & SrcB; // and
-            default: ALUResult = 'x;
+        case (ALUControl)
+            5'b00000: ALUResult = Sum;           // ADD / ADDI / LW / SW
+            5'b00001: ALUResult = Sum;           // SUB / BEQ
+            5'b00010: ALUResult = SrcA << Shamt; // SLL / SLLI
+            5'b00011: ALUResult = {31'b0, LT};   // SLT / SLTI
+            5'b00100: ALUResult = {31'b0, (SrcA < SrcB)}; // SLTU / SLTIU (unsigned)
+            5'b00101: ALUResult = SrcA ^ SrcB; // XOR / XORI
+            5'b00110: ALUResult = SrcA >> Shamt;  // SRL / SRLI
+            5'b00111: ALUResult = $signed(SrcA) >>> Shamt; // SRA / SRAI
+            5'b01000: ALUResult = SrcA | SrcB;   // OR  / ORI
+            5'b01001: ALUResult = SrcA & SrcB;   // AND / ANDI
+            5'b01010: ALUResult = SrcB;          // LUI (pass upper-immediate)
+            5'b01011: ALUResult = {Sum[31:1], 1'b0}; // JALR — rs1 + imm, LSB cleared
+
+            //multiply instruction
+            5'b01100: ALUResult = mul_unsigned[31:0];  // MUL
+            5'b01101: ALUResult = mul_signed[63:32];   // MULH
+            5'b01110: ALUResult = mul_mixed[63:32]; // MULHSU
+            5'b01111: ALUResult = mul_unsigned[63:32];    // MULHU
+
+            default:  ALUResult = 'x;
         endcase
     end
+
 endmodule

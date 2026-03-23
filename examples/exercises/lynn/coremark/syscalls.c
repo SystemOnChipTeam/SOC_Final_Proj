@@ -62,7 +62,7 @@ static uintptr_t syscall(uintptr_t which, uint64_t arg0, uint64_t arg1, uint64_t
   return magic_mem[0];
 }
 
-#define NUM_COUNTERS 10
+#define NUM_COUNTERS 11
 static unsigned long long counters[NUM_COUNTERS];
 static char* counter_names[NUM_COUNTERS];
 
@@ -86,6 +86,7 @@ void computeStats(int difference)
   READ_CTR(hpmcounter8);   // counters[7]
   READ_CTR(hpmcounter9);   // counters[8]
   READ_CTR(hpmcounter10);  // counters[9]
+  READ_CTR(hpmcounter11);  // counters[10]
 
 #undef READ_CTR
 }
@@ -139,11 +140,11 @@ void _init(int cid, int nc)
 {
   init_tls();
   thread_entry(cid, nc);
-  //computeStats(0); // TODO uncomment to update counters array
+  computeStats(0); // TODO uncomment to update counters array
 
   // Run coremark
   int ret = main(0, 0);
-  //computeStats(1); // TODO uncomment to update counters array
+  computeStats(1); // TODO uncomment to update counters array
 
   // Counter print stats
 
@@ -156,12 +157,12 @@ void _init(int cid, int nc)
   ee_printf("Branches Taken (hpm5) %lld\n",        counters[4]);
 
   // Implementation-defined (your choice):
-  ee_printf("Custom Counter 6 (hpm6) %lld\n",      counters[5]);
-  ee_printf("Custom Counter 7 (hpm7) %lld\n",      counters[6]);
-  ee_printf("Custom Counter 8 (hpm8) %lld\n",      counters[7]);
-  ee_printf("Custom Counter 9 (hpm9) %lld\n",      counters[8]);
-  ee_printf("Custom Counter 10 (hpm10) %lld\n",    counters[9]);
-
+  ee_printf("Load Counter (hpm6) %lld\n",      counters[5]);
+  ee_printf("Store Counter (hpm7) %lld\n",      counters[6]);
+  ee_printf("Jump Counter (hpm8) %lld\n",      counters[7]);
+  ee_printf("Mul Counter (hpm9) %lld\n",      counters[8]);
+  ee_printf("Shift Counter (hpm10) %lld\n",    counters[9]);
+  ee_printf("Logical Counter (hpm11) %lld\n",    counters[10]);
   ee_printf("Done printing performance counters\n");
 
   exit(ret);
