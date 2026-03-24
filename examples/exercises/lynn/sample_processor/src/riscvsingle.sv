@@ -24,10 +24,42 @@ module riscvsingle (
     logic PCSrc;
     logic Load;
 
-    ifu ifu(.clk, .reset, .PCSrc, .IEUAdr, .PC, .PCPlus4);
-    ieu ieu(.clk, .reset, .Instr, .PC, .PCPlus4, .PCSrc, .WriteByteEn,
+    ifu ifu(.clk, .reset,
+        //inputs
+        .StallF, .StallD .FlushD,
+        .PCSrcE, .IEUAdrE,
+
+        //outputs
+        .PCD, .InstrD
+    );
+
+    ieu ieu(.clk, .reset,
+        //inputs
+        .StallE, .FlushE, .ForwardedSrcAE, .ForwardedSrcBE,
+        .PCD, .InstrD, .RdW,
+
+        //outputs
+        .PCSrcE, .IEUAdrE,
+        .MemRWE, .ResultSrcE, .RegWriteE,
+        .WriteByteEn, .MemEn
+
+        //Previous
+        .Instr, .PC, .PCPlus4, .PCSrc, .WriteByteEn,
             .IEUAdr, .WriteData, .ReadData, .MemEn
         );
+
+    lsu lsu(.clk, .reset,
+    //inputs
+
+
+    //outputs
+
+    );
+
+    //pipeline registers
+
+
+    hazard hzu();
 
     assign WriteEn = |WriteByteEn;
 endmodule
