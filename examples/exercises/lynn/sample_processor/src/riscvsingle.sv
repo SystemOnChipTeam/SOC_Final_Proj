@@ -1,6 +1,6 @@
 // riscvsingle.sv
-// RISC-V single-cycle processor
-// David_Harris@hmc.edu 2020 kacassidy@hmc.edu 2025
+// RISC-V multi-cycle processor
+// Max Conine and Pierce Clark
 
 `include "parameters.svh"
 
@@ -36,7 +36,9 @@ module riscvsingle (
     ieu ieu(.clk, .reset,
         //inputs
         .StallE, .FlushE, .ForwardedSrcAE, .ForwardedSrcBE,
-        .PCD, .InstrD, .RdW,
+        .PCD, .InstrD, .RdW, 
+		
+		RegWriteW, ResultSrcW, 
 
         //outputs
         .PCSrcE, .IEUAdrE,
@@ -49,11 +51,11 @@ module riscvsingle (
         );
 
     lsu lsu(.clk, .reset,
-    //inputs
+    	//inputs
+		.FlushM, .StallM, .MemRWE, .ResultSrcE, .RegWriteE, .IEUResultE, .FSrcBE, .IEUAdrE, .Funct3E, .RdE,
 
-
-    //outputs
-
+    	//outputs
+		.RegWriteW, .ResultSrcW, .IEUResultW, .IEUResultM, .ReadDataW, .RdW
     );
 
     //pipeline registers
