@@ -1,11 +1,39 @@
 // controller.sv
-// Organised by opcode; only implements instructions present in the original.
+// RISC-V multi-cycle processor
+// Max Conine and Pierce Clark
 
 module controller(
-    input  logic [6:0] Op,
-    input  logic [2:0] Flags,
-    input  logic [2:0] Funct3,
-    input  logic [6:0] Funct7,
+	input logic clk, reset,
+	// -- inputs -- 
+	// Decode stage control signals
+    input  logic [31:0] InstrD,                  // Instruction in Decode stage
+	output logic [2:0]  ImmSrcD,                 // Type of immediate extension
+    // Execute stage control signals
+	input  logic [2:0] 	FlagsE, 			     // Comparison flags ({eq, lt})
+	input  logic 		StallE, FlushE,			 // Stall, flush Execute stage
+	input  logic		ZeroE,
+	output logic [1:0]	ResultSrcE,
+	output logic [2:0]  ALUControlE,			 // ALU Control signals from Execute stage
+	output logic		ALUSrcE,
+	output logic		PCSrcE,					 // 1 for PCTargetE, 0 for PCPlus4
+	// Memory stage control signals
+	input  logic        StallM, FlushM,          // Stall, flush Memory stage
+	output logic        MemEnM,					 // MemEn for loads and stores
+	output logic 		RegWriteM,				 // For writing to register
+	output logic		MemWriteM,               // Mem write for stores
+
+	// Writeback control signals
+	input  logic        StallW, FlushW,          // Stall, flush Writeback stage
+	output logic        RegWriteW,
+	output logic [1:0]	ResultSrcW,
+
+
+	// do we need this? output logic        CSRReadM, CSRWriteM, PrivilegedM, // CSR read, write, or privileged instruction
+	// input  logic        StallD, FlushD,          // Stall, flush Decode stage. Removed bc don't need to check if instruction is valid
+
+	// -- Outputs --
+	
+	// old
     output logic       ALUResultSrc,
     output logic       ResultSrc,
     output logic       PCSrc,
@@ -14,19 +42,54 @@ module controller(
     output logic [1:0] ALUSrc,
     output logic [2:0] ImmSrc,
     output logic [4:0] ALUControl,
-    output logic       MemEn,
+
     output logic       CSRSrc
 );
+
+	logic [6:0] OpD;                             // Opcode in Decode stage
+	logic [2:0] Funct3D;                         // Funct3 field in Decode stage
+	logic [6:0] Funct7D;                         // Funct7 field in Decode stage
+
+	// pipelined control signals
+	// decode
+  	logic       RegWriteD, MemWriteD, JumpD, BranchD, ALUSrcD;
+	logic [1:0]	ResultSrcD;
+	logic [2:0] ALUControlD;
+	// execute
+	logic RegWriteE;
+
+	// memory
+
+	// write
+
+	logic [2:0]  ResultSrcD, ResultSrcM; // Select which result to write back to register file
+	
+	logic MemWriteD
+
+	// Extract fields
+	assign OpD     = InstrD[6:0];
+	assign Funct3D = InstrD[14:12];
+	assign Funct7D = InstrD[31:25];
+	assign Rs1D    = InstrD[19:15];
+	assign Rs2D    = InstrD[24:20];
+	assign RdD     = InstrD[11:7];
+
+	assign PCSrcE = JumpE | (BranchE & ZeroE);
+
+
+	flopenrc #(32) RD1EReg(clk, reset, FlushE, ~StallE, {RegWriteD, ResultSrcD, MemWriteD, JumpD, BranchD, ALUControlD, ALUControlD, ALUSrcD}, {RegWriteD, ResultSrcD, MemWriteD, JumpD, BranchD, ALUControlD, ALUControlD, ALUSrcD});
+
+	// old
 
     logic Branch, Jump,BranchTaken;
 
     always_comb begin
         // Safe defaults — prevent latches and X-propagation on unknown opcodes
         RegWrite     = 1'b0;
-        ImmSrc       = 3'b000;
+        ImmSrcD       = 3'b000;
         ALUSrc       = 2'b00;
         ALUResultSrc = 1'b0;
-        MemWrite     = 1'b0;
+        MemWriteD     = 1'b0;
         ResultSrc    = 1'b0;
         Branch       = 1'b0;
         Jump         = 1'b0;
@@ -43,10 +106,10 @@ module controller(
             // -----------------------------------------------------------------
             7'b0000011: begin
                 RegWrite     = 1'b1;
-                ImmSrc       = 3'b000;    // I-immediate
+                ImmSrcD       = 3'b000;    // I-immediate
                 ALUSrc       = 2'b01;    // immediate offset
                 ALUResultSrc = 1'b0;
-                MemWrite     = 1'b0;
+                MemWriteD     = 1'b0;
                 ResultSrc    = 1'b1;     // write data from memory to rd
                 Branch       = 1'b0;
                 Jump         = 1'b0;
@@ -61,10 +124,10 @@ module controller(
             // -----------------------------------------------------------------
             7'b0100011: begin
                 RegWrite     = 1'b0;
-                ImmSrc       = 3'b001;    // S-immediate
+                ImmSrcD       = 3'b001;    // S-immediate
                 ALUSrc       = 2'b01;    // immediate offset
                 ALUResultSrc = 1'b0;
-                MemWrite     = 1'b1;
+                MemWriteD     = 1'b1;
                 ResultSrc    = 1'b0;
                 Branch       = 1'b0;
                 Jump         = 1'b0;
@@ -80,10 +143,10 @@ module controller(
 
             7'b0110011: begin
                 RegWrite     = 1'b1;
-                ImmSrc       = 3'bxxx;    // unused
+                ImmSrcD       = 3'bxxx;    // unused
                 ALUSrc       = 2'b00;    // both operands from register file
                 ALUResultSrc = 1'b0;
-                MemWrite     = 1'b0;
+                MemWriteD     = 1'b0;
                 ResultSrc    = 1'b0;
                 Branch       = 1'b0;
                 Jump         = 1'b0;
@@ -121,10 +184,10 @@ module controller(
             // -----------------------------------------------------------------
             7'b0010011: begin
                 RegWrite     = 1'b1;
-                ImmSrc       = 3'b000;    // I-immediate
+                ImmSrcD       = 3'b000;    // I-immediate
                 ALUSrc       = 2'b01;    // second operand = immediate
                 ALUResultSrc = 1'b0;
-                MemWrite     = 1'b0;
+                MemWriteD     = 1'b0;
                 ResultSrc    = 1'b0;
                 Branch       = 1'b0;
                 Jump         = 1'b0;
@@ -150,10 +213,10 @@ module controller(
             // -----------------------------------------------------------------
             7'b0110111: begin
                 RegWrite     = 1'b1;
-                ImmSrc       = 3'b100;    // U-immediate
+                ImmSrcD       = 3'b100;    // U-immediate
                 ALUSrc       = 2'b01;    // pass immediate as SrcB; SrcA unused
                 ALUResultSrc = 1'b0;
-                MemWrite     = 1'b0;
+                MemWriteD     = 1'b0;
                 ResultSrc    = 1'b0;
                 Branch       = 1'b0;
                 Jump         = 1'b0;
@@ -169,10 +232,10 @@ module controller(
             // -----------------------------------------------------------------
             7'b1100011: begin
                 RegWrite     = 1'b0;
-                ImmSrc       = 3'b010;    // B-immediate
+                ImmSrcD       = 3'b010;    // B-immediate
                 ALUSrc       = 2'b11;    // both operands from register file
                 ALUResultSrc = 1'b0;
-                MemWrite     = 1'b0;
+                MemWriteD     = 1'b0;
                 ResultSrc    = 1'b0;
                 Branch       = 1'b1;
                 Jump         = 1'b0;
@@ -181,12 +244,12 @@ module controller(
                 ALUControl   = 5'b00000; // ADD (sets zero flag for Eq)
 
                 case (Funct3)
-                    3'b000: BranchTaken = Flags[0];   // BEQ  — equal
-                    3'b001: BranchTaken = ~Flags[0];  // BNE  — not equal
-                    3'b100: BranchTaken = Flags[1];   // BLT  — signed less than
-                    3'b101: BranchTaken = ~Flags[1];  // BGE  — signed greater or equal (not less than)
-                    3'b110: BranchTaken = Flags[2];   // BLTU — unsigned less than
-                    3'b111: BranchTaken = ~Flags[2];  // BGEU — unsigned greater or equal (not less than)
+                    3'b000: BranchTaken = FlagsE[0];   // BEQ  — equal
+                    3'b001: BranchTaken = ~FlagsE[0];  // BNE  — not equal
+                    3'b100: BranchTaken = FlagsE[1];   // BLT  — signed less than
+                    3'b101: BranchTaken = ~FlagsE[1];  // BGE  — signed greater or equal (not less than)
+                    3'b110: BranchTaken = FlagsE[2];   // BLTU — unsigned less than
+                    3'b111: BranchTaken = ~FlagsE[2];  // BGEU — unsigned greater or equal (not less than)
                     default: BranchTaken = 1'b0;
                 endcase
             end
@@ -197,10 +260,10 @@ module controller(
             // -----------------------------------------------------------------
             7'b1101111: begin
                 RegWrite     = 1'b1;
-                ImmSrc       = 3'b011;    // J-immediate
+                ImmSrcD       = 3'b011;    // J-immediate
                 ALUSrc       = 2'b11;    // PC + imm (computed in separate adder)
                 ALUResultSrc = 1'b1;     // write PC+4 to rd
-                MemWrite     = 1'b0;
+                MemWriteD     = 1'b0;
                 ResultSrc    = 1'b0;
                 Branch       = 1'b0;
                 Jump         = 1'b1;
@@ -215,10 +278,10 @@ module controller(
             // -----------------------------------------------------------------
             7'b1100111: begin
                 RegWrite     = 1'b1;
-                ImmSrc       = 3'b000;   // I-immediate
+                ImmSrcD       = 3'b000;   // I-immediate
                 ALUSrc       = 2'b01;    // SrcA = rs1, SrcB = immediate
                 ALUResultSrc = 1'b1;     // write PC+4 to rd
-                MemWrite     = 1'b0;
+                MemWriteD     = 1'b0;
                 ResultSrc    = 1'b0;
                 Branch       = 1'b0;
                 Jump         = 1'b1;
@@ -233,10 +296,10 @@ module controller(
             // -----------------------------------------------------------------
             7'b0010111: begin
                 RegWrite     = 1'b1;
-                ImmSrc       = 3'b100;   // U-immediate
+                ImmSrcD       = 3'b100;   // U-immediate
                 ALUSrc       = 2'b11;    // SrcA = PC, SrcB = immediate
                 ALUResultSrc = 1'b0;
-                MemWrite     = 1'b0;
+                MemWriteD     = 1'b0;
                 ResultSrc    = 1'b0;
                 Branch       = 1'b0;
                 Jump         = 1'b0;
@@ -251,10 +314,10 @@ module controller(
             // -----------------------------------------------------------------
             7'b1110011: begin
                 RegWrite     = 1'b1;    // write CSR value to rd
-                ImmSrc       = 3'b000;  // unused
+                ImmSrcD       = 3'b000;  // unused
                 ALUSrc       = 2'b00;
                 ALUResultSrc = 1'b0;
-                MemWrite     = 1'b0;
+                MemWriteD     = 1'b0;
                 ResultSrc    = 1'b0;
                 Branch       = 1'b0;
                 Jump         = 1'b0;
