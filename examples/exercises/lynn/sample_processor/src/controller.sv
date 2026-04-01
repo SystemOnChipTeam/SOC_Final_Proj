@@ -5,117 +5,56 @@
 module controller(
 	input logic clk, reset,
 	// -- inputs -- 
-	// Decode stage control signals
     input  logic [31:0] InstrD,                  // Instruction in Decode stage
+	// -- outputs --
+	output logic 		MemEnD, RegWriteD, 
+	output logic [1:0]  ResultSrcD,
+	output logic		MemWriteD, JumpD, BranchD,
+	output logic [4:0]  ALUControlD,
+	output logic		ALUSrcD,				 // 1 chooses ImmExt, O chooses WriteData. Using 0th bit from old processor
 	output logic [2:0]  ImmSrcD,                 // Type of immediate extension
-    // Execute stage control signals
-	input  logic [2:0] 	FlagsE, 			     // Comparison flags ({eq, lt})
-	input  logic 		StallE, FlushE,			 // Stall, flush Execute stage
-	input  logic		ZeroE,
-	output logic [1:0]	ResultSrcE,
-	output logic [2:0]  ALUControlE,			 // ALU Control signals from Execute stage
-	output logic		ALUSrcE,
-	output logic		PCSrcE,					 // 1 for PCTargetE, 0 for PCPlus4
-	// Memory stage control signals
-	input  logic        StallM, FlushM,          // Stall, flush Memory stage
-	output logic        MemEnM,					 // MemEn for loads and stores
-	output logic 		RegWriteM,				 // For writing to register
-	output logic		MemWriteM,               // Mem write for stores
-
-	// Writeback control signals
-	input  logic        StallW, FlushW,          // Stall, flush Writeback stage
-	output logic        RegWriteW,
-	output logic [1:0]	ResultSrcW,
-
-
-	// do we need this? output logic        CSRReadM, CSRWriteM, PrivilegedM, // CSR read, write, or privileged instruction
-	// input  logic        StallD, FlushD,          // Stall, flush Decode stage. Removed bc don't need to check if instruction is valid
-
-	// -- Outputs --
-	
-	// old
-    output logic       ALUResultSrc,
-    output logic       ResultSrc,
-    output logic       PCSrc,
-    output logic       RegWrite,
-    output logic       MemWrite,
-    output logic [1:0] ALUSrc,
-    output logic [2:0] ImmSrc,
-    output logic [4:0] ALUControl,
-
-    output logic       CSRSrc
+	output logic		CSRSrcD
 );
 
 	logic [6:0] OpD;                             // Opcode in Decode stage
 	logic [2:0] Funct3D;                         // Funct3 field in Decode stage
 	logic [6:0] Funct7D;                         // Funct7 field in Decode stage
 
-	// pipelined control signals
-	// decode
-  	logic       RegWriteD, MemWriteD, JumpD, BranchD, ALUSrcD;
-	logic [1:0]	ResultSrcD;
-	logic [2:0] ALUControlD;
-	// execute
-	logic RegWriteE;
-
-	// memory
-
-	// write
-
-	logic [2:0]  ResultSrcD, ResultSrcM; // Select which result to write back to register file
-	
-	logic MemWriteD
-
 	// Extract fields
 	assign OpD     = InstrD[6:0];
 	assign Funct3D = InstrD[14:12];
 	assign Funct7D = InstrD[31:25];
-	assign Rs1D    = InstrD[19:15];
-	assign Rs2D    = InstrD[24:20];
-	assign RdD     = InstrD[11:7];
-
-	assign PCSrcE = JumpE | (BranchE & ZeroE);
-
-
-	flopenrc #(32) RD1EReg(clk, reset, FlushE, ~StallE, {RegWriteD, ResultSrcD, MemWriteD, JumpD, BranchD, ALUControlD, ALUControlD, ALUSrcD}, {RegWriteD, ResultSrcD, MemWriteD, JumpD, BranchD, ALUControlD, ALUControlD, ALUSrcD});
-
-	// old
-
-    logic Branch, Jump,BranchTaken;
 
     always_comb begin
         // Safe defaults — prevent latches and X-propagation on unknown opcodes
-        RegWrite     = 1'b0;
+        RegWriteD      = 1'b0;
         ImmSrcD       = 3'b000;
-        ALUSrc       = 2'b00;
-        ALUResultSrc = 1'b0;
+        ALUSrcD       = 1'b0;
+        ResultSrcD    = 2'b00; // used to be 0 0
         MemWriteD     = 1'b0;
-        ResultSrc    = 1'b0;
-        Branch       = 1'b0;
-        Jump         = 1'b0;
-        MemEn        = 1'b0;
-        ALUControl   = 5'b00000; // ADD
+        BranchD       = 1'b0;
+        JumpD         = 1'b0;
+        MemEnD        = 1'b0;
+        ALUControlD   = 5'b00000; // ADD
         BranchTaken = 1'b0;
-        CSRSrc = 1'b0;
+        CSRSrcD = 1'b0;
 
-        case (Op)
-
+        case (OpD)
             // -----------------------------------------------------------------
             // LW  (Op = 0000011)
             // rd = M[rs1 + imm]
             // -----------------------------------------------------------------
             7'b0000011: begin
-                RegWrite     = 1'b1;
-                ImmSrcD       = 3'b000;    // I-immediate
-                ALUSrc       = 2'b01;    // immediate offset
-                ALUResultSrc = 1'b0;
-                MemWriteD     = 1'b0;
-                ResultSrc    = 1'b1;     // write data from memory to rd
-                Branch       = 1'b0;
-                Jump         = 1'b0;
-                MemEn        = 1'b1;
-                CSRSrc       = 1'b0;
-                ALUControl   = 5'b00000; // ADD (address = rs1 + imm)
+                RegWriteD     = 1'b1;
+                ImmSrcD      = 3'b000;    // I-immediate
+                ALUSrcD       = 1'b1;    // immediate offset
+                ResultSrcD   = 2'b01;    // write data from memory to rd
+                MemWriteD    = 1'b0;
+                BranchD       = 1'b0;
+                JumpD          = 1'b0;
+                MemEnD       = 1'b1;
+                CSRSrcD       = 1'b0;
+                ALUControlD   = 5'b00000; // ADD (address = rs1 + imm)
             end
 
             // -----------------------------------------------------------------
@@ -123,17 +62,16 @@ module controller(
             // M[rs1 + imm] = rs2
             // -----------------------------------------------------------------
             7'b0100011: begin
-                RegWrite     = 1'b0;
+                RegWriteD     = 1'b0;
                 ImmSrcD       = 3'b001;    // S-immediate
-                ALUSrc       = 2'b01;    // immediate offset
-                ALUResultSrc = 1'b0;
+                ALUSrcD       = 1'b1;    // immediate offset
+                ResultSrcD = 2'b00;
                 MemWriteD     = 1'b1;
-                ResultSrc    = 1'b0;
-                Branch       = 1'b0;
-                Jump         = 1'b0;
-                MemEn        = 1'b1;
-                CSRSrc       = 1'b0;
-                ALUControl   = 5'b00000; // ADD (address = rs1 + imm)
+                BranchD       = 1'b0;
+                JumpD          = 1'b0;
+                MemEnD       = 1'b1;
+                CSRSrcD       = 1'b0;
+                ALUControlD   = 5'b00000; // ADD (address = rs1 + imm)
             end
 
             // -----------------------------------------------------------------
@@ -142,38 +80,37 @@ module controller(
             // -----------------------------------------------------------------
 
             7'b0110011: begin
-                RegWrite     = 1'b1;
+                RegWriteD     = 1'b1;
                 ImmSrcD       = 3'bxxx;    // unused
-                ALUSrc       = 2'b00;    // both operands from register file
-                ALUResultSrc = 1'b0;
+                ALUSrcD       = 1'b0;    // both operands from register file
+                ResultSrcD = 2'b00;
                 MemWriteD     = 1'b0;
-                ResultSrc    = 1'b0;
-                Branch       = 1'b0;
-                Jump         = 1'b0;
-                MemEn        = 1'b0;
-                CSRSrc       = 1'b0;
+                BranchD       = 1'b0;
+                JumpD          = 1'b0;
+                MemEnD       = 1'b0;
+                CSRSrcD       = 1'b0;
 
-                if (Funct7[0]) begin
+                if (Funct7D[0]) begin
                     // Zmmul
-                    case (Funct3)
-                        3'b000: ALUControl = 5'b01100; // MUL
-                        3'b001: ALUControl = 5'b01101; // MULH
-                        3'b010: ALUControl = 5'b01110; // MULHSU
-                        3'b011: ALUControl = 5'b01111; // MULHU
-                        default: ALUControl = 5'b00000;
+                    case (Funct3D)
+                        3'b000: ALUControlD = 5'b01100; // MUL
+                        3'b001: ALUControlD = 5'b01101; // MULH
+                        3'b010: ALUControlD = 5'b01110; // MULHSU
+                        3'b011: ALUControlD = 5'b01111; // MULHU
+                        default: ALUControlD = 5'b00000;
                     endcase
                 end else begin
-                    case (Funct3)
-                        3'b000: ALUControl = Funct7[5] ? 5'b00001  // SUB
+                    case (Funct3D)
+                        3'b000: ALUControlD = Funct7D[5] ? 5'b00001  // SUB
                                                     : 5'b00000; // ADD
-                        3'b001: ALUControl = 5'b00010; // SLL
-                        3'b010: ALUControl = 5'b00011; // SLT
-                        3'b011: ALUControl = 5'b00100; // SLTU
-                        3'b100: ALUControl = 5'b00101; // XOR
-                        3'b101: ALUControl = Funct7[5] ? 5'b00111 : 5'b00110; // SRA or SRL
-                        3'b110: ALUControl = 5'b01000; // OR
-                        3'b111: ALUControl = 5'b01001; // AND
-                        default: ALUControl = 5'b00000;
+                        3'b001: ALUControlD = 5'b00010; // SLL
+                        3'b010: ALUControlD = 5'b00011; // SLT
+                        3'b011: ALUControlD = 5'b00100; // SLTU
+                        3'b100: ALUControlD = 5'b00101; // XOR
+                        3'b101: ALUControlD = Funct7D[5] ? 5'b00111 : 5'b00110; // SRA or SRL
+                        3'b110: ALUControlD = 5'b01000; // OR
+                        3'b111: ALUControlD = 5'b01001; // AND
+                        default: ALUControlD = 5'b00000;
                     endcase
                 end
             end
@@ -183,27 +120,26 @@ module controller(
             // rd = rs1 <op> imm
             // -----------------------------------------------------------------
             7'b0010011: begin
-                RegWrite     = 1'b1;
-                ImmSrcD       = 3'b000;    // I-immediate
-                ALUSrc       = 2'b01;    // second operand = immediate
-                ALUResultSrc = 1'b0;
-                MemWriteD     = 1'b0;
-                ResultSrc    = 1'b0;
-                Branch       = 1'b0;
-                Jump         = 1'b0;
-                MemEn        = 1'b0;
-                CSRSrc       = 1'b0;
+                RegWriteD     = 1'b1;
+                ImmSrcD      = 3'b000;    // I-immediate
+                ALUSrcD       = 1'b1;    // second operand = immediate
+                ResultSrcD   = 2'b00;
+                MemWriteD    = 1'b0;
+                BranchD       = 1'b0;
+                JumpD          = 1'b0;
+                MemEnD       = 1'b0;
+                CSRSrcD       = 1'b0;
 
                 case (Funct3)
-                    3'b000: ALUControl = 5'b00000; // ADDI
-                    3'b001: ALUControl = 5'b00010; // SLLI
-                    3'b010: ALUControl = 5'b00011; // SLTI
-                    3'b011: ALUControl = 5'b00100; // SLTUI
-                    3'b100: ALUControl = 5'b00101; // XOR
-                    3'b101: ALUControl = Funct7[5] ? 5'b00111 : 5'b00110; // SRAI or SRLI
-                    3'b110: ALUControl = 5'b01000; // ORI
-                    3'b111: ALUControl = 5'b01001; // ANDI
-                    default: ALUControl = 5'b00000;
+                    3'b000: ALUControlD = 5'b00000; // ADDI
+                    3'b001: ALUControlD = 5'b00010; // SLLI
+                    3'b010: ALUControlD = 5'b00011; // SLTI
+                    3'b011: ALUControlD = 5'b00100; // SLTUI
+                    3'b100: ALUControlD = 5'b00101; // XOR
+                    3'b101: ALUControlD = Funct7D[5] ? 5'b00111 : 5'b00110; // SRAI or SRLI
+                    3'b110: ALUControlD = 5'b01000; // ORI
+                    3'b111: ALUControlD = 5'b01001; // ANDI
+                    default: ALUControlD = 5'b00000;
                 endcase
             end
 
@@ -212,17 +148,16 @@ module controller(
             // rd = {imm, 12'b0}  — upper immediate, rs1 unused
             // -----------------------------------------------------------------
             7'b0110111: begin
-                RegWrite     = 1'b1;
-                ImmSrcD       = 3'b100;    // U-immediate
-                ALUSrc       = 2'b01;    // pass immediate as SrcB; SrcA unused
-                ALUResultSrc = 1'b0;
-                MemWriteD     = 1'b0;
-                ResultSrc    = 1'b0;
-                Branch       = 1'b0;
-                Jump         = 1'b0;
-                MemEn        = 1'b0;
-                CSRSrc       = 1'b0;
-                ALUControl   = 5'b01010; // PASS-B (rd = SrcB = upper immediate)
+                RegWriteD     = 1'b1;
+                ImmSrcD      = 3'b100;    // U-immediate
+                ALUSrcD       = 1'b1;    // pass immediate as SrcB; SrcA unused
+                ResultSrcD   = 2'b00;
+                MemWriteD    = 1'b0;
+                BranchD       = 1'b0;
+                JumpD          = 1'b0;
+                MemEnD       = 1'b0;
+                CSRSrcD       = 1'b0;
+                ALUControlD  = 5'b01010; // PASS-B (rd = SrcB = upper immediate)
             end
 
             // -----------------------------------------------------------------
@@ -231,27 +166,16 @@ module controller(
             // BNE: if (rs1 != rs2) PC = PC + imm  — Funct3 = 001
             // -----------------------------------------------------------------
             7'b1100011: begin
-                RegWrite     = 1'b0;
-                ImmSrcD       = 3'b010;    // B-immediate
-                ALUSrc       = 2'b11;    // both operands from register file
-                ALUResultSrc = 1'b0;
-                MemWriteD     = 1'b0;
-                ResultSrc    = 1'b0;
-                Branch       = 1'b1;
-                Jump         = 1'b0;
-                MemEn        = 1'b0;
-                CSRSrc       = 1'b0;
-                ALUControl   = 5'b00000; // ADD (sets zero flag for Eq)
-
-                case (Funct3)
-                    3'b000: BranchTaken = FlagsE[0];   // BEQ  — equal
-                    3'b001: BranchTaken = ~FlagsE[0];  // BNE  — not equal
-                    3'b100: BranchTaken = FlagsE[1];   // BLT  — signed less than
-                    3'b101: BranchTaken = ~FlagsE[1];  // BGE  — signed greater or equal (not less than)
-                    3'b110: BranchTaken = FlagsE[2];   // BLTU — unsigned less than
-                    3'b111: BranchTaken = ~FlagsE[2];  // BGEU — unsigned greater or equal (not less than)
-                    default: BranchTaken = 1'b0;
-                endcase
+                RegWriteD     = 1'b0;
+                ImmSrcD      = 3'b010;    // B-immediate
+                ALUSrcD       = 1'b1;    // both operands from register file
+                ResultSrcD   = 2'b00;
+                MemWriteD    = 1'b0;
+                BranchD       = 1'b1;
+                JumpD          = 1'b0;
+                MemEnD       = 1'b0;
+                CSRSrcD       = 1'b0;
+                ALUControlD   = 5'b00000; // ADD (sets zero flag for Eq)
             end
 
             // -----------------------------------------------------------------
@@ -259,17 +183,16 @@ module controller(
             // rd = PC+4 ; PC = PC + imm
             // -----------------------------------------------------------------
             7'b1101111: begin
-                RegWrite     = 1'b1;
+                RegWriteD     = 1'b1;
                 ImmSrcD       = 3'b011;    // J-immediate
-                ALUSrc       = 2'b11;    // PC + imm (computed in separate adder)
-                ALUResultSrc = 1'b1;     // write PC+4 to rd
+                ALUSrcD       = 1'b1;    // PC + imm (computed in separate adder)
+                ResultSrcD   = 2'b10;     // write PC+4 to rd
                 MemWriteD     = 1'b0;
-                ResultSrc    = 1'b0;
-                Branch       = 1'b0;
-                Jump         = 1'b1;
-                MemEn        = 1'b0;
-                CSRSrc       = 1'b0;
-                ALUControl   = 5'b00000; // ADD (jump target)
+                BranchD       = 1'b0;
+                JumpD          = 1'b1;
+                MemEnD       = 1'b0;
+                CSRSrcD       = 1'b0;
+                ALUControlD   = 5'b00000; // ADD (jump target)
             end
 
             // -----------------------------------------------------------------
@@ -277,17 +200,16 @@ module controller(
             // rd = PC+4 ; PC = (rs1 + imm) & ~1
             // -----------------------------------------------------------------
             7'b1100111: begin
-                RegWrite     = 1'b1;
+                RegWriteD     = 1'b1;
                 ImmSrcD       = 3'b000;   // I-immediate
-                ALUSrc       = 2'b01;    // SrcA = rs1, SrcB = immediate
-                ALUResultSrc = 1'b1;     // write PC+4 to rd
+                ALUSrcD       = 1'b1;    // SrcA = rs1, SrcB = immediate
+                ResultSrcD   = 2'b10;     // write PC+4 to rd
                 MemWriteD     = 1'b0;
-                ResultSrc    = 1'b0;
-                Branch       = 1'b0;
-                Jump         = 1'b1;
-                MemEn        = 1'b0;
-                CSRSrc       = 1'b0;
-                ALUControl = 5'b01011; // ADD + clear LSB for JALR
+                BranchD       = 1'b0;
+                JumpD          = 1'b1;
+                MemEnD       = 1'b0;
+                CSRSrcD       = 1'b0;
+                ALUControlD = 5'b01011; // ADD + clear LSB for JALR
             end
 
             // -----------------------------------------------------------------
@@ -295,17 +217,16 @@ module controller(
             // rd = PC + {imm, 12'b0}
             // -----------------------------------------------------------------
             7'b0010111: begin
-                RegWrite     = 1'b1;
+                RegWriteD     = 1'b1;
                 ImmSrcD       = 3'b100;   // U-immediate
-                ALUSrc       = 2'b11;    // SrcA = PC, SrcB = immediate
-                ALUResultSrc = 1'b0;
+                ALUSrcD       = 1'b1;    // SrcA = PC, SrcB = immediate
+                ResultSrcD   = 2'b00;
                 MemWriteD     = 1'b0;
-                ResultSrc    = 1'b0;
-                Branch       = 1'b0;
-                Jump         = 1'b0;
-                MemEn        = 1'b0;
-                CSRSrc       = 1'b0;
-                ALUControl   = 5'b00000; // ADD (PC + imm)
+                BranchD       = 1'b0;
+                JumpD          = 1'b0;
+                MemEnD       = 1'b0;
+                CSRSrcD       = 1'b0;
+                ALUControlD   = 5'b00000; // ADD (PC + imm)
             end
 
             // -----------------------------------------------------------------
@@ -313,17 +234,16 @@ module controller(
             // rd = CSR[addr]; CSR[addr] |= rs1
             // -----------------------------------------------------------------
             7'b1110011: begin
-                RegWrite     = 1'b1;    // write CSR value to rd
+                RegWriteD     = 1'b1;    // write CSR value to rd
                 ImmSrcD       = 3'b000;  // unused
-                ALUSrc       = 2'b00;
-                ALUResultSrc = 1'b0;
+                ALUSrcD       = 1'b0;
+                ResultSrcD   = 2'b00;
                 MemWriteD     = 1'b0;
-                ResultSrc    = 1'b0;
-                Branch       = 1'b0;
-                Jump         = 1'b0;
-                MemEn        = 1'b0;
-                ALUControl   = 5'b00000;
-                CSRSrc       = 1'b1;    // select CSR result into result mux
+                BranchD       = 1'b0;
+                JumpD          = 1'b0;
+                MemEnD       = 1'b0;
+                ALUControlD   = 5'b00000;
+                CSRSrcD       = 1'b1;    // select CSR result into result mux
             end
 
             // Default / unimplemented
@@ -338,8 +258,5 @@ module controller(
             end
         endcase
     end
-
-    // Output assignments
-    assign PCSrc = (Branch & BranchTaken) | Jump;
 
 endmodule
