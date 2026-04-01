@@ -22,6 +22,8 @@ module hazard(
 		output	logic			StallD, FlushD
 		output	logic			StallE, FlushE
 		output	logic [1:0]		ForwardAE, ForwardBE,
+        output	logic           StallM, FlushM, 
+        output	logic           StallW, FlushW
 )
 
 	logic lwStall;

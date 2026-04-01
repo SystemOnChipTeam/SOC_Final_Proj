@@ -5,7 +5,8 @@ module lsu(
         input   logic           clk, reset,
         input   logic           MemEnM,
 		input	logic	        RegWriteE,
-        input	logic   [1:0]	ResultSrcE, MemWriteM,
+        input	logic   [1:0]	ResultSrcE, 
+        input	logic           MemWriteM,
 		input	logic			ALUResultE,
 		input	logic			WriteDataE,
 		input	logic 			RdE,
@@ -16,7 +17,7 @@ module lsu(
         input	logic			StallM, FlushM, StallW, FlushW,
         output	logic [4:0]		RdM,
 		output	logic 			RegWriteM,
-
+        
 		// Outputs
         output  logic	        RegWriteW, 
         output  logic   [1:0]   ResultSrcW,
