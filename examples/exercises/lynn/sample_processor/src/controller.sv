@@ -1,36 +1,37 @@
 // controller.sv
 // RISC-V multi-cycle processor
 // Max Conine and Pierce Clark
+// pclark@hmc.edu mconine@hmc.edu 2026
 
 module controller(
-	input logic clk, reset,
-	// -- inputs -- 
-    input  logic [31:0] InstrD,                  // Instruction in Decode stage
-	// -- outputs --
-	output logic 		MemEnD, RegWriteD, 
-	output logic [1:0]  ResultSrcD,
-	output logic		MemWriteD, JumpD, BranchD,
-	output logic [4:0]  ALUControlD,
-	output logic		ALUSrcD,				 // 1 chooses ImmExt, O chooses WriteData. Using 0th bit from old processor
-	output logic [2:0]  ImmSrcD,                 // Type of immediate extension
-	output logic		CSRSrcD
+    input logic clk, reset,
+    // -- inputs --
+    input  logic [31:0] InstrD,                    // Instruction in Decode stage
+    // -- outputs --
+    output logic        MemEnD, RegWriteD,         // MemEnD for load/store, RegWriteD for register file write enable
+    output logic [1:0]  ResultSrcD,                // Selects value to write to register file: 00 = ALU result, 01 = ReadData, 10 = PC+4, 11 = PCTarget (for AUIPC)
+    output logic        MemWriteD, JumpD, BranchD, // control signals for memory write, jump, and branch instructions
+    output logic [4:0]  ALUControlD,               // ALU control signals
+    output logic        ALUSrcD,                   // 1 chooses ImmExt, O chooses WriteData. Using 0th bit from old processor
+    output logic [2:0]  ImmSrcD,                   // Type of immediate extension
+    output logic        CSRSrcD                    // 1 selects CSR result for writing to rd, 0 selects ALU result
 );
 
-	logic [6:0] OpD;                             // Opcode in Decode stage
-	logic [2:0] Funct3D;                         // Funct3 field in Decode stage
-	logic [6:0] Funct7D;                         // Funct7 field in Decode stage
+    logic [6:0] OpD;                             // Opcode in Decode stage
+    logic [2:0] Funct3D;                         // Funct3 field in Decode stage
+    logic [6:0] Funct7D;                         // Funct7 field in Decode stage
 
-	// Extract fields
-	assign OpD     = InstrD[6:0];
-	assign Funct3D = InstrD[14:12];
-	assign Funct7D = InstrD[31:25];
+    // extract fields
+    assign OpD     = InstrD[6:0];
+    assign Funct3D = InstrD[14:12];
+    assign Funct7D = InstrD[31:25];
 
     always_comb begin
-        // Safe defaults — prevent latches and X-propagation on unknown opcodes
+        // Safe default values for control signals
         RegWriteD      = 1'b0;
         ImmSrcD       = 3'b000;
         ALUSrcD       = 1'b0;
-        ResultSrcD    = 2'b00; // used to be 0 0
+        ResultSrcD    = 2'b00;
         MemWriteD     = 1'b0;
         BranchD       = 1'b0;
         JumpD         = 1'b0;
@@ -39,10 +40,8 @@ module controller(
         CSRSrcD = 1'b0;
 
         case (OpD)
-            // -----------------------------------------------------------------
             // LW  (Op = 0000011)
             // rd = M[rs1 + imm]
-            // -----------------------------------------------------------------
             7'b0000011: begin
                 RegWriteD     = 1'b1;
                 ImmSrcD      = 3'b000;    // I-immediate
@@ -56,10 +55,8 @@ module controller(
                 ALUControlD   = 5'b00000; // ADD (address = rs1 + imm)
             end
 
-            // -----------------------------------------------------------------
             // SW  (Op = 0100011)
             // M[rs1 + imm] = rs2
-            // -----------------------------------------------------------------
             7'b0100011: begin
                 RegWriteD     = 1'b0;
                 ImmSrcD       = 3'b001;    // S-immediate
@@ -73,11 +70,8 @@ module controller(
                 ALUControlD   = 5'b00000; // ADD (address = rs1 + imm)
             end
 
-            // -----------------------------------------------------------------
             // R-TYPE  (Op = 0110011)
             // rd = rs1 <op> rs2
-            // -----------------------------------------------------------------
-
             7'b0110011: begin
                 RegWriteD     = 1'b1;
                 ImmSrcD       = 3'bxxx;    // unused
@@ -114,10 +108,8 @@ module controller(
                 end
             end
 
-            // -----------------------------------------------------------------
             // I-TYPE ALU  (Op = 0010011)
             // rd = rs1 <op> imm
-            // -----------------------------------------------------------------
             7'b0010011: begin
                 RegWriteD     = 1'b1;
                 ImmSrcD      = 3'b000;    // I-immediate
@@ -142,10 +134,8 @@ module controller(
                 endcase
             end
 
-            // -----------------------------------------------------------------
             // LUI  (Op = 0110111)
             // rd = {imm, 12'b0}  — upper immediate, rs1 unused
-            // -----------------------------------------------------------------
             7'b0110111: begin
                 RegWriteD     = 1'b1;
                 ImmSrcD      = 3'b100;    // U-immediate
@@ -159,11 +149,9 @@ module controller(
                 ALUControlD  = 5'b01010; // PASS-B (rd = SrcB = upper immediate)
             end
 
-            // -----------------------------------------------------------------
             // BRANCH  (Op = 1100011)
             // BEQ: if (rs1 == rs2) PC = PC + imm  — Funct3 = 000
             // BNE: if (rs1 != rs2) PC = PC + imm  — Funct3 = 001
-            // -----------------------------------------------------------------
             7'b1100011: begin
                 RegWriteD     = 1'b0;
                 ImmSrcD      = 3'b010;    // B-immediate
@@ -177,10 +165,8 @@ module controller(
                 ALUControlD   = 5'b00000; // ADD (sets zero flag for Eq)
             end
 
-            // -----------------------------------------------------------------
             // JAL  (Op = 1101111)
             // rd = PC+4 ; PC = PC + imm
-            // -----------------------------------------------------------------
             7'b1101111: begin
                 RegWriteD     = 1'b1;
                 ImmSrcD       = 3'b011;    // J-immediate
@@ -194,10 +180,8 @@ module controller(
                 ALUControlD   = 5'b00000; // ADD (jump target)
             end
 
-            // -----------------------------------------------------------------
             // JALR  (Op = 1100111)
             // rd = PC+4 ; PC = (rs1 + imm) & ~1
-            // -----------------------------------------------------------------
             7'b1100111: begin
                 RegWriteD     = 1'b1;
                 ImmSrcD       = 3'b000;   // I-immediate
@@ -211,14 +195,12 @@ module controller(
                 ALUControlD = 5'b01011; // ADD + clear LSB for JALR
             end
 
-            // -----------------------------------------------------------------
             // AUIPC  (Op = 0010111)
             // rd = PC + {imm, 12'b0}
-            // -----------------------------------------------------------------
             7'b0010111: begin
                 RegWriteD     = 1'b1;
                 ImmSrcD       = 3'b100;   // U-immediate
-                ALUSrcD       = 1'b1;    
+                ALUSrcD       = 1'b1;
                 ResultSrcD   = 2'b11;
                 MemWriteD     = 1'b0;
                 BranchD       = 1'b0;
@@ -228,10 +210,8 @@ module controller(
                 ALUControlD   = 5'b00000; // ADD (PC + imm)
             end
 
-            // -----------------------------------------------------------------
             // CSRRS  (Op = 1110011)
             // rd = CSR[addr]; CSR[addr] |= rs1
-            // -----------------------------------------------------------------
             7'b1110011: begin
                 RegWriteD     = 1'b1;    // write CSR value to rd
                 ImmSrcD       = 3'b000;  // unused
@@ -245,7 +225,7 @@ module controller(
                 CSRSrcD       = 1'b1;    // select CSR result into result mux
             end
 
-            // Default / unimplemented
+            // For unimplemented instructions
             default: begin
 `ifdef DEBUG
                 if (insn_debug !== 'x) begin
@@ -253,7 +233,6 @@ module controller(
                     $finish(-1);
                 end
 `endif
-                // all signals hold the safe defaults assigned at the top
             end
         endcase
     end
