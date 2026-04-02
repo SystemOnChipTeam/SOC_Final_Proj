@@ -1,61 +1,58 @@
-// Tests for SLL (Shift Left Logical)
-// Logic: rd = rs1 << rs2[4:0]
-// Constraints: Only addi, beq, j, lui, li, and sll.
+// Tests for SLLI (Shift Left Logical Immediate)
+// Logic: rd = rs1 << imm[4:0]
+// Constraints: Only addi, beq, j, lui, li, and slli.
 
-.extern return_sll_test
+.extern return_slli_test
 .extern fail
 .section .text.init
-.globl sll_test
-.type sll_test, @function
+.globl slli_test
+.type slli_test, @function
 
-sll_test:
+slli_test:
 
     # -----------------------------------------------------------------
-    # Test 1: Basic Shift Left
+    # Test 1: Basic Shift Left Immediate
     # Logic: 1 << 4 = 16
     # -----------------------------------------------------------------
-test_sll_1:
+test_slli_1:
     li      t1, 1
-    li      t2, 4
-    sll     t3, t1, t2
+    slli    t3, t1, 4
     li      t4, 16
-    beq     t3, t4, test_sll_2
-    j       Fail_Sll_1
+    beq     t3, t4, test_slli_2
+    j       Fail_Slli_1
 
     # -----------------------------------------------------------------
-    # Test 2: Shift Left by Zero (Identity)
+    # Test 2: Shift Left Immediate by Zero (Identity)
     # Logic: 0xABC << 0 = 0xABC
     # -----------------------------------------------------------------
-test_sll_2:
+test_slli_2:
     li      t1, 0xABC
-    li      t2, 0
-    sll     t3, t1, t2
+    slli    t3, t1, 0
     li      t4, 0xABC
-    beq     t3, t4, test_sll_3
-    j       Fail_Sll_2
+    beq     t3, t4, test_slli_3
+    j       Fail_Slli_2
 
     # -----------------------------------------------------------------
-    # Test 3: Shift to MSB
+    # Test 3: Shift Immediate to MSB
     # Logic: 1 << 31 = 0x80000000
     # -----------------------------------------------------------------
-test_sll_3:
+test_slli_3:
     li      t1, 1
-    li      t2, 31
-    sll     t3, t1, t2
+    slli    t3, t1, 31
     lui     t4, 0x80000         # 0x80000000
-    beq     t3, t4, pass_sll
-    j       Fail_Sll_3
+    beq     t3, t4, pass_slli
+    j       Fail_Slli_3
 
-pass_sll:
-    j return_sll_test
+pass_slli:
+    j return_slli_test
 
 # --- Failure Handlers ---
-Fail_Sll_1:
-    li gp, 1351
+Fail_Slli_1:
+    li gp, 1411
     j fail
-Fail_Sll_2:
-    li gp, 1352
+Fail_Slli_2:
+    li gp, 1412
     j fail
-Fail_Sll_3:
-    li gp, 1353
+Fail_Slli_3:
+    li gp, 1413
     j fail

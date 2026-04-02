@@ -6,13 +6,12 @@
 
 module riscvsingle (
         input   logic           clk, reset,
-
         // Instruction Memory Interface
         output  logic [31:0]    PC,  // instruction memory target address
         input   logic [31:0]    Instr, // instruction memory read data
 
         // Data Memory Interface
-        output  logic [31:0]    DataAdr,  // data memory target address
+        output  logic [31:0]    IEUAdr,  // data memory target address
         input   logic [31:0]    ReadData, // data memory read data
         output  logic [31:0]    WriteData, // data memory write data
         output  logic           MemEn,
@@ -36,18 +35,21 @@ module riscvsingle (
 
     // LSU to IEU (Memory stage, for forwarding)
     logic [31:0] ALUResultM;
-    assign DataAdr = ALUResultM;
+    assign IEUAdr = ALUResultM;
 
     // LSU to IEU (Writeback stage)
     logic        RegWriteW;
     logic [1:0]  ResultSrcW;
     logic [31:0] ALUResultW, ReadDataW, PCPlus4W;
     logic [4:0]  RdW;
+    logic [31:0] PCTargetW;
 
-    // Hazard unit to IFU/IEU/LSU
+    // Hazard unit outputs to IFU/IEU/LSU
     logic        StallF, StallD, FlushD;
     logic        StallE, FlushE;
     logic [1:0]  ForwardAE, ForwardBE;
+    logic        StallM, FlushM;
+    logic        StallW, FlushW;
 
     // Hazard unit inputs from IEU/LSU
     logic [4:0]  Rs1D, Rs2D;
@@ -98,9 +100,8 @@ module riscvsingle (
         // Execute stage inputs
         .MemEnE, .RegWriteE, .ResultSrcE, .MemWriteE,
         .ALUResultE, .WriteDataE, .RdE, .PCPlus4E, .Funct3E, .PCTargetE,
-        // Hazard unit interface
-        .StallM(1'b0), .FlushM(1'b0),
-        .StallW(1'b0), .FlushW(1'b0),
+        .StallM, .FlushM,
+        .StallW, .FlushW,
         .RdM, .RegWriteM,
         // Writeback outputs to IEU
         .RegWriteW, .ResultSrcW,
@@ -115,6 +116,8 @@ module riscvsingle (
     );
 
     hazard hzu(
+        // Inputs
+        .clk, .reset,
         // Decode stage
         .Rs1D, .Rs2D,
         // Execute stage
@@ -132,7 +135,9 @@ module riscvsingle (
         // Stall execute
         .StallE,
         // Forwarding
-        .ForwardAE, .ForwardBE
+        .ForwardAE, .ForwardBE,
+        .StallM, .FlushM,
+        .StallW, .FlushW
     );
 
 endmodule

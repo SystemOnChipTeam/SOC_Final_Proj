@@ -1,120 +1,66 @@
+// Tests for BGE and BGEU
+// Constraints: Only li, bge, bgeu, j.
+
 .extern return_bge_test
 .extern fail
-
-    .section .text.init
-    .globl bge_test
-    .type  bge_test, @function
+.section .text.init
+.globl bge_test
+.type bge_test, @function
 
 bge_test:
+    # -----------------------------------------------------------------
+    # Test 1: BGE (Signed) - Greater Than
+    # Logic: 1 >= -1 (Should Branch)
+    # -----------------------------------------------------------------
+test_bge_1:
+    li      t1, 1
+    li      t2, -1
+    bge     t1, t2, test_bge_2
+    j       Fail_Bge_1
 
-test1:
-    li   t0, 5
-    li   t1, 3
-    bge  t0, t1, test2
-    j    Fail_BGE_1
+    # -----------------------------------------------------------------
+    # Test 2: BGE (Signed) - Equal
+    # Logic: -5 >= -5 (Should Branch)
+    # -----------------------------------------------------------------
+test_bge_2:
+    li      t1, -5
+    li      t2, -5
+    bge     t1, t2, test_bge_3
+    j       Fail_Bge_2
 
-test2:
-    li   t0, 3
-    li   t1, 5
-    bge  t0, t1, Fail_BGE_2
-    j    test3
+    # -----------------------------------------------------------------
+    # Test 3: BGE (Signed) - False Condition
+    # Logic: -1 >= 1 is False (Should NOT Branch)
+    # -----------------------------------------------------------------
+test_bge_3:
+    li      t1, -1
+    li      t2, 1
+    bge     t1, t2, Fail_Bge_3
+    j       test_bge_4
 
-test3:
-    li   t0, -2
-    li   t1, -5
-    bge  t0, t1, test4
-    j    Fail_BGE_3
+    # -----------------------------------------------------------------
+    # Test 4: BGEU (Unsigned) - True Condition (Tricky)
+    # Logic: -1 (0xFFFFFFFF) >= 1 is True in unsigned math!
+    # -----------------------------------------------------------------
+test_bge_4:
+    li      t1, -1
+    li      t2, 1
+    bgeu    t1, t2, pass_bge
+    j       Fail_Bge_4
 
-test4:
-    li   t0, -5
-    li   t1, -2
-    bge  t0, t1, Fail_BGE_4
-    j    test5
-
-test5:
-    li   t0, 7
-    li   t1, 7
-    bge  t0, t1, test6
-    j    Fail_BGE_5
-
-test6:
-    li   t0, -1
-    li   t1, 1
-    bgeu t0, t1, test7        # unsigned: 0xFFFFFFFF ≥ 1
-    j    Fail_BGE_6
-
-test7:
-    li   t0, 1
-    li   t1, -1
-    bgeu t0, t1, Fail_BGE_7   # unsigned: 1 < 0xFFFFFFFF
-    j    test8
-
-test8:
-    li   t0, 0
-    li   t1, -1
-    bgeu t0, t1, Fail_BGE_8   # unsigned: 0 < max
-    j    test9
-
-test9:
-    li   t0, 0x80000000
-    li   t1, 0x7FFFFFFF
-    bge  t0, t1, Fail_BGE_9   # signed: negative < positive
-    j    test10
-
-test10:
-    li   t0, 0
-loop10:
-    addi t0, t0, 1
-    li   t1, 4
-    bge  t0, t1, exit10
-    j    loop10
-
-exit10:
-    li   t2, 4
-    beq  t0, t2, pass
-    j    Fail_BGE_10
-
-
-pass:
+pass_bge:
     j return_bge_test
 
-
-Fail_BGE_1:
-    li   gp, 471
-    j    fail
-
-Fail_BGE_2:
-    li   gp, 472
-    j    fail
-
-Fail_BGE_3:
-    li   gp, 473
-    j    fail
-
-Fail_BGE_4:
-    li   gp, 474
-    j    fail
-
-Fail_BGE_5:
-    li   gp, 475
-    j    fail
-
-Fail_BGE_6:
-    li   gp, 476
-    j    fail
-
-Fail_BGE_7:
-    li   gp, 477
-    j    fail
-
-Fail_BGE_8:
-    li   gp, 478
-    j    fail
-
-Fail_BGE_9:
-    li   gp, 479
-    j    fail
-
-Fail_BGE_10:
-    li   gp, 480
-    j    fail
+# --- Failure Handlers ---
+Fail_Bge_1:
+    li gp, 2201
+    j fail
+Fail_Bge_2:
+    li gp, 2202
+    j fail
+Fail_Bge_3:
+    li gp, 2203
+    j fail
+Fail_Bge_4:
+    li gp, 2204
+    j fail

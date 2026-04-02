@@ -3,19 +3,19 @@
 // pclark@hmc.edu mconine@hmc.edu 2026
 
 module ieu(
-		// Inputs Decode Stage
+        // Inputs Decode Stage
         input   logic           clk, reset,
         input   logic [31:0]    InstrD,
         input   logic [31:0]    PCD,
         input   logic [31:0]    PCPlus4D,
 
         // Outputs Execute Stage
-		output	logic	        MemEnE, RegWriteE,
-        output  logic [1:0]     ResultSrcE, 
+        output  logic           MemEnE, RegWriteE,
+        output  logic [1:0]     ResultSrcE,
         output  logic           MemWriteE,
-		output	logic [31:0]	ALUResultE,
-		output	logic [31:0]	WriteDataE,
-		output	logic [2:0]		Funct3E,
+        output  logic [31:0]    ALUResultE,
+        output  logic [31:0]    WriteDataE,
+        output  logic [2:0]     Funct3E,
         output  logic [31:0]    PCPlus4E,
         output  logic [31:0]    PCTargetE,
 
@@ -23,7 +23,7 @@ module ieu(
         input logic [31:0] ALUResultM,
 
         // Inputs Writeback Stage
-        input   logic           RegWriteW, 
+        input   logic           RegWriteW,
         input   logic [1:0]     ResultSrcW,
         input   logic [31:0]    ALUResultW,
         input   logic [31:0]    ReadDataW,
@@ -32,14 +32,14 @@ module ieu(
         input   logic [31:0]    PCTargetW,
 
         // Hazard Unit Decode Stage Interface
-        output	logic [4:0]		Rs1D, Rs2D,
+        output  logic [4:0]     Rs1D, Rs2D,
 
         // Hazard Unit Execute Stage Interface
-		input 	logic			StallE, FlushE, 
-		input	logic [1:0]		ForwardAE, ForwardBE,
-		output	logic [4:0]		Rs1E, Rs2E, RdE, 
-		output	logic			PCSrcE, 
-		output	logic 			ResultSrcE0
+        input   logic           StallE, FlushE,
+        input   logic [1:0]     ForwardAE, ForwardBE,
+        output  logic [4:0]     Rs1E, Rs2E, RdE,
+        output  logic           PCSrcE,
+        output  logic           ResultSrcE0
     );
 
     // Decode Stade internal signals
@@ -47,14 +47,15 @@ module ieu(
     logic        MemEnD, RegWriteD, MemWriteD;
     logic [1:0]  ResultSrcD;
     logic        JumpD, BranchD, ALUSrcD;
-    logic [4:0]  ALUControlD, ImmSrcD;
+    logic [4:0]  ALUControlD;
+    logic [2:0]  ImmSrcD;
     // Datapath (D-stage)
     logic [31:0] Rd1D, Rd2D, ImmExtD;
 
     // Execute Stage internal signals
     logic [31:0] Rd1E, Rd2E, PCE, ImmExtE;
     logic        JumpE, BranchE, ALUSrcE;
-    logic [2:0]  ALUControlE;
+    logic [4:0]  ALUControlE;
     logic [31:0] SrcAE, SrcBE;
     logic [2:0]  FlagsE;
     logic BranchTaken;
@@ -74,7 +75,7 @@ module ieu(
     controller c(.clk, .reset, .InstrD, .MemEnD, .RegWriteD, .ResultSrcD, .MemWriteD, .JumpD, .BranchD, .ALUControlD, .ALUSrcD, .ImmSrcD, .CSRSrcD);
 
     // Register file logic
-    regfile rf(.clk, .WE3(RegWrite), .A1(InstrD[19:15]), .A2(InstrD[24:20]),
+    regfile rf(.clk, .WE3(RegWriteW), .A1(InstrD[19:15]), .A2(InstrD[24:20]),
         .A3(RdW), .WD3(ResultW), .RD1(Rd1D), .RD2(Rd2D));
 
     // TODO: keep this?
@@ -85,7 +86,7 @@ module ieu(
     // extender blender chicken nuggets remember
     extend ext(.Instr(InstrD[31:7]), .ImmSrc(ImmSrcD), .ImmExt(ImmExtD));
 
-	// Pipeline Register E-Stage
+    // Pipeline Register E-Stage
     // Controller registers
     flopenrc #(1) MemEnEReg    (clk, reset, FlushE, ~StallE, MemEnD,     MemEnE);
     flopenrc #(1) RegWriteEReg (clk, reset, FlushE, ~StallE, RegWriteD,  RegWriteE);
@@ -97,24 +98,24 @@ module ieu(
     flopenrc #(1) ALUSrcEReg   (clk, reset, FlushE, ~StallE, ALUSrcD,    ALUSrcE);
 
     // Datapath registers
-	flopenrc #(32) RD1EReg(clk, reset, FlushE, ~StallE, Rd1D, Rd1E);
-  	flopenrc #(32) RD2EReg(clk, reset, FlushE, ~StallE, Rd2D, Rd2E);
-	flopenrc #(32) PCEReg(clk, reset, FlushE, ~StallE, PCD, PCE);
+    flopenrc #(32) RD1EReg(clk, reset, FlushE, ~StallE, Rd1D, Rd1E);
+      flopenrc #(32) RD2EReg(clk, reset, FlushE, ~StallE, Rd2D, Rd2E);
+    flopenrc #(32) PCEReg(clk, reset, FlushE, ~StallE, PCD, PCE);
     flopenrc #(5)  Rs1EReg(clk, reset, FlushE, ~StallE, InstrD[19:15], Rs1E);
     flopenrc #(5)  Rs2EReg(clk, reset, FlushE, ~StallE, InstrD[24:20], Rs2E);
     flopenrc #(5)  RdEReg(clk, reset, FlushE, ~StallE, InstrD[11:7], RdE);
 
-	flopenrc #(32) ImmExtEReg(clk, reset, FlushE, ~StallE, ImmExtD, ImmExtE);
+    flopenrc #(32) ImmExtEReg(clk, reset, FlushE, ~StallE, ImmExtD, ImmExtE);
     flopenrc #(32) PCPlus4EReg(clk, reset, FlushE, ~StallE, PCPlus4D, PCPlus4E);
     flopenrc #(3)  Funct3EReg(clk, reset, FlushE, ~StallE, InstrD[14:12], Funct3E);
-	
-	// Datapath
-	mux3 #(32) ForwardmuxA(Rd1E, ALUResultM, ResultW, ForwardAE, SrcAE);
+
+    // Datapath
+    mux3 #(32) ForwardmuxA(Rd1E, ALUResultM, ResultW, ForwardAE, SrcAE);
     mux3 #(32) ForwardmuxB(Rd2E, ALUResultM, ResultW, ForwardBE, WriteDataE);
 
     // Comparitor and ALU
     mux2 #(32) srcbmux(WriteDataE, ImmExtE, ALUSrcE, SrcBE);
-    cmp comparator(.SrcAE(SrcAE), .SrcBE(SrcBE), .FlagsE(FlagsE));
+    cmp comparator(.SrcA(SrcAE), .SrcB(SrcBE), .Flags(FlagsE));
     alu alu(SrcAE, SrcBE, ALUControlE, ALUResultE);
 
     adder pcadder(PCE, ImmExtE, PCTargetE);
@@ -134,6 +135,5 @@ module ieu(
 
     // TODO: add CSR logic and connect to controller and csrfile
     // Writeback mux
-    mux3 #(32) resultmux(ALUResultW, ReadDataW, PCPlus4W, ResultSrcW, ResultW);
-
+    mux4 #(32) resultmux(ALUResultW, ReadDataW, PCPlus4W, PCTargetW, ResultSrcW, ResultW);
 endmodule

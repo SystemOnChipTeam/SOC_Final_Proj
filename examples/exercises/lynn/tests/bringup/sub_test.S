@@ -31,9 +31,9 @@ sub_test:
         j return_sub_test
 
 Fail_Sub_1:
-    li   gp, 401
+    li   gp, 410
     j    fail
 
 Fail_Sub_2:
-    li   gp, 402
+    li   gp, 412
     j    fail
