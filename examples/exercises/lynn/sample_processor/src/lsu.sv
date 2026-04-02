@@ -33,7 +33,7 @@ module lsu(
         output  logic   [31:0]  DataInM, // data memory write data
 
         output  logic           MemEnM, MemWriteM,
-        output  logic   [3:0]   WriteByteEn  // strobes, 1 hot stating weather a byte should be written on a store
+        output  logic   [3:0]   WriteByteEn
     );
 
     // Declare internal signals
@@ -56,6 +56,8 @@ module lsu(
 
     logic [15:0]    HalfwordM;
     logic [7:0]     ByteM;
+    logic [3:0] WriteByteEn;
+
     // Subword Read — select and sign/zero extend based on Funct3 and address
     mux2 #(16) halfwordmux(DataOutM[15:0], DataOutM[31:16], ALUResultM[1], HalfwordM);
     mux2 #(8)  bytemux(HalfwordM[7:0], HalfwordM[15:8],    ALUResultM[0], ByteM);
@@ -97,5 +99,7 @@ module lsu(
     flopenrc #(32) ReadDataWReg (clk, reset, FlushW, ~StallW, ReadDataM, ReadDataW);
     flopenrc #(5)  RdWReg       (clk, reset, FlushW, ~StallW, RdM,       RdW);
     flopenrc #(32) PCPlus4WReg  (clk, reset, FlushW, ~StallW, PCPlus4M,  PCPlus4W);
+
+    
 
 endmodule

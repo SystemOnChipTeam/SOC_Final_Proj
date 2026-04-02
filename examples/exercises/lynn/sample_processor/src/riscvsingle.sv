@@ -5,60 +5,134 @@
 `include "parameters.svh"
 
 module riscvsingle (
-        input   logic           clk,
-        input   logic           reset,
+        input   logic           clk, reset,
 
+        // Instruction Memory Interface
         output  logic [31:0]    PC,  // instruction memory target address
         input   logic [31:0]    Instr, // instruction memory read data
 
-        output  logic [31:0]    IEUAdr,  // data memory target address
+        // Data Memory Interface
+        output  logic [31:0]    DataAdr,  // data memory target address
         input   logic [31:0]    ReadData, // data memory read data
         output  logic [31:0]    WriteData, // data memory write data
-
         output  logic           MemEn,
         output  logic           WriteEn,
         output  logic [3:0]     WriteByteEn  // strobes, 1 hot stating weather a byte should be written on a store
     );
 
-    logic [31:0] PCPlus4;
-    logic PCSrc;
-    logic Load;
+    // IFU to IEU
+    logic [31:0] InstrD, PCD, PCPlus4D;
 
-    ifu ifu(.clk, .reset,
-        //inputs
-        .StallF, .StallD .FlushD,
-        .PCSrcE, .IEUAdrE,
+    // IEU to IFU
+    logic        PCSrcE;
+    logic [31:0] PCTargetE;
 
-        //outputs
-        .PCD, .InstrD
+    // IEU to LSU (Execute stage)
+    logic        MemEnE, RegWriteE, MemWriteE;
+    logic [1:0]  ResultSrcE;
+    logic [31:0] ALUResultE, WriteDataE, PCPlus4E;
+    logic [2:0]  Funct3E;
+    logic [4:0]  RdE;
+
+    // LSU to IEU (Memory stage, for forwarding)
+    logic [31:0] ALUResultM;
+    assign DataAdr = ALUResultM;
+
+    // LSU to IEU (Writeback stage)
+    logic        RegWriteW;
+    logic [1:0]  ResultSrcW;
+    logic [31:0] ALUResultW, ReadDataW, PCPlus4W;
+    logic [4:0]  RdW;
+
+    // Hazard unit to IFU/IEU/LSU
+    logic        StallF, StallD, FlushD;
+    logic        StallE, FlushE;
+    logic [1:0]  ForwardAE, ForwardBE;
+
+    // Hazard unit inputs from IEU/LSU
+    logic [4:0]  Rs1D, Rs2D;
+    logic [4:0]  Rs1E, Rs2E;
+    logic        ResultSrcE0;
+    logic [4:0]  RdM;
+    logic        RegWriteM;
+
+    ifu ifu(
+        .clk, .reset,
+        // Hazard unit
+        .StallF, .StallD, .FlushD,
+        // From Execute stage
+        .PCSrcE,
+        .PCTargetE,
+        // Outputs to Decode stage
+        .InstrD, .PCD, .PCPlus4D,
+        // Instruction memory interface
+        .PCF(PC),
+        .InstrF(Instr)
     );
 
-    ieu ieu(.clk, .reset,
-        //inputs
-        .StallE, .FlushE, .ForwardedSrcAE, .ForwardedSrcBE,
-        .PCD, .InstrD, .RdW, 
-		
-		RegWriteW, ResultSrcW, 
-
-        //outputs
-        .PCSrcE, .IEUAdrE,
-        .MemRWE, .ResultSrcE, .RegWriteE,
-        .WriteByteEn, .MemEn
-
-        //Previous
-        .Instr, .PC, .PCPlus4, .PCSrc, .WriteByteEn,
-            .IEUAdr, .WriteData, .ReadData, .MemEn
-        );
-
-    lsu lsu(.clk, .reset,
-    	//inputs
-		.FlushM, .StallM, .MemRWE, .ResultSrcE, .RegWriteE, .IEUResultE, .FSrcBE, .IEUAdrE, .Funct3E, .RdE,
-
-    	//outputs
-		.RegWriteW, .ResultSrcW, .IEUResultW, .IEUResultM, .ReadDataW, .RdW
+    ieu ieu(
+        .clk, .reset,
+        // Decode stage inputs
+        .InstrD, .PCD, .PCPlus4D,
+        // Execute stage outputs
+        .MemEnE, .RegWriteE, .ResultSrcE, .MemWriteE,
+        .ALUResultE, .WriteDataE, .Funct3E, .PCPlus4E,
+        .PCTargetE,
+        // Memory stage input (forwarding)
+        .ALUResultM,
+        // Writeback stage inputs
+        .RegWriteW, .ResultSrcW,
+        .ALUResultW, .ReadDataW, .PCPlus4W, .RdW,
+        // Hazard unit — Decode
+        .Rs1D, .Rs2D,
+        // Hazard unit — Execute
+        .StallE, .FlushE,
+        .ForwardAE, .ForwardBE,
+        .Rs1E, .Rs2E, .RdE,
+        .PCSrcE,
+        .ResultSrcE0
     );
 
-    hazard hzu();
+    lsu lsu(
+        .clk, .reset,
+        // Execute stage inputs
+        .MemEnE, .RegWriteE, .ResultSrcE, .MemWriteE,
+        .ALUResultE, .WriteDataE, .RdE, .PCPlus4E, .Funct3E,
+        // Hazard unit interface
+        .StallM(1'b0), .FlushM(1'b0),
+        .StallW(1'b0), .FlushW(1'b0),
+        .RdM, .RegWriteM,
+        // Writeback outputs to IEU
+        .RegWriteW, .ResultSrcW,
+        .ALUResultW, .ReadDataW, .PCPlus4W, .RdW,
+        // DTIM interface
+        .ALUResultM,
+        .DataOutM(ReadData),
+        .DataInM(WriteData),
+        .MemEnM(MemEn),
+        .MemWriteM(WriteEn),
+        .WriteByteEn(WriteByteEn)
+    );
 
-    assign WriteEn = |WriteByteEn;
+    hazard hzu(
+        // Decode stage
+        .Rs1D, .Rs2D,
+        // Execute stage
+        .Rs1E, .Rs2E, .RdE,
+        .PCSrcE,
+        .ResultSrcE0,
+        // Memory stage
+        .RdM, .RegWriteM,
+        // Writeback stage
+        .RegWriteW, .RdW,
+        // Stall outputs
+        .StallF, .StallD,
+        // Flush outputs
+        .FlushD, .FlushE,
+        // Stall execute
+        .StallE,
+        // Forwarding
+        .ForwardAE, .ForwardBE
+    );
+
 endmodule

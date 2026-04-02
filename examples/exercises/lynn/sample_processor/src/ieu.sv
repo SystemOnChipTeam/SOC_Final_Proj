@@ -46,7 +46,7 @@ module ieu(
     logic        MemEnD, RegWriteD, MemWriteD;
     logic [1:0]  ResultSrcD;
     logic        JumpD, BranchD, ALUSrcD;
-    logic [2:0]  ALUControlD, ImmSrcD;
+    logic [4:0]  ALUControlD, ImmSrcD;
     // Datapath (D-stage)
     logic [31:0] Rd1D, Rd2D, ImmExtD;
 
@@ -118,7 +118,7 @@ module ieu(
     // Comparitor and ALU
     mux2 #(32) srcbmux(WriteDataE, ImmExtE, ALUSrcE, SrcBE);
     cmp comparator(.SrcAE(SrcAE), .SrcBE(SrcBE), .FlagsE(FlagsE));
-    alu alu(.SrcAE, .SrcBE, .ALUControlE, .ALUResultE);
+    alu alu(SrcAE, SrcBE, ALUControlE, ALUResultE);
 
     adder pcadder(PCE, ImmExtE, PCTargetE);
 
