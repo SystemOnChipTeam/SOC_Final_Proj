@@ -5,43 +5,43 @@
 module lsu(
         // Inputs
         input   logic           clk, reset,
-        input   logic           MemEnE,
-        input   logic           RegWriteE,
-        input   logic   [1:0]   ResultSrcE,
-        input   logic           MemWriteE,
-        input   logic   [31:0]  ALUResultE,
-        input   logic   [31:0]  WriteDataE,
-        input   logic   [4:0]   RdE,
-        input   logic   [31:0]  PCPlus4E,
-        input   logic   [2:0]   Funct3E,
-        input   logic   [31:0]  PCTargetE,
+        input   logic           MemEnE,     // Memory enable
+        input   logic           RegWriteE,  // Register file write enable
+        input   logic   [1:0]   ResultSrcE, // Result source selector
+        input   logic           MemWriteE,  // Memory write enable
+        input   logic   [31:0]  ALUResultE, // ALU result
+        input   logic   [31:0]  WriteDataE, // Data to write to memory
+        input   logic   [4:0]   RdE,        // Destination register
+        input   logic   [31:0]  PCPlus4E,   // PC+4 value
+        input   logic   [2:0]   Funct3E,    // Function 3 field
+        input   logic   [31:0]  PCTargetE,  // Branch target address
 
         // Hazard Unit interface
-        input   logic StallM, FlushM, StallW, FlushW,
-        output  logic [4:0] RdM,
-        output  logic RegWriteM,
+        input   logic StallM, FlushM, StallW, FlushW, // stall and flush signals for M and W stages
+        output  logic [4:0] RdM,                      // destination register in Memory stage
+        output  logic RegWriteM,                      // register file write enable in Memory stage
 
         // Outputs
-        output  logic         RegWriteW,
-        output  logic   [1:0]   ResultSrcW,
-        output  logic   [31:0]  ALUResultW, ReadDataW, PCPlus4W,
-        output  logic   [4:0]   RdW,
-        output logic    [31:0]  PCTargetW,
+        output  logic         RegWriteW,                         // register file write enable in Writeback stage
+        output  logic   [1:0]   ResultSrcW,                      // Result source selector in Writeback stage
+        output  logic   [31:0]  ALUResultW, ReadDataW, PCPlus4W, // ALU result, memory read data, and PC+4 value in Writeback stage
+        output  logic   [4:0]   RdW,                             // Destination register in Writeback stage
+        output logic    [31:0]  PCTargetW,                       // Branch target address in Writeback stage
 
         // DTIM Interface
-        output  logic   [31:0]  ALUResultM,  // data memory target address
-        input   logic   [31:0]  DataOutM, // data memory read data
-        output  logic   [31:0]  DataInM, // data memory write data
+        output  logic   [31:0]  ALUResultM,  // Data memory target address
+        input   logic   [31:0]  DataOutM,    // Data memory read data
+        output  logic   [31:0]  DataInM,     // Data memory write data
 
-        output  logic           MemEnM, MemWriteM,
-        output  logic   [3:0]   WriteByteEn
+        output  logic           MemEnM, MemWriteM, // Memory enable and write enable in Memory stage
+        output  logic   [3:0]   WriteByteEn        // Byte enable signals for memory writes
     );
 
     // Declare internal signals
-    logic   [1:0]   ResultSrcM;
-    logic   [31:0]  WriteDataM, ReadDataM, PCPlus4M;
-    logic   [2:0]   Funct3M;
-    logic   [31:0]  PCTargetM;
+    logic   [1:0]   ResultSrcM;                      // Result source selector in Memory stage
+    logic   [31:0]  WriteDataM, ReadDataM, PCPlus4M; // Data to write to memory, data read from memory, and PC+4 value in Memory stage
+    logic   [2:0]   Funct3M;                         // Function 3 field in Memory stage
+    logic   [31:0]  PCTargetM;                       // Branch target address in Memory stage
 
     // Pipeline Register M-Stage
     flopenrc #(1)  MemEnMReg    (clk, reset, FlushM, ~StallM, MemEnE,    MemEnM);
@@ -57,7 +57,6 @@ module lsu(
 
 
     //DTIM Read and Write Logic
-
     logic [15:0]    HalfwordM;
     logic [7:0]     ByteM;
 
@@ -75,7 +74,7 @@ module lsu(
             default: ReadDataM = DataOutM;
         endcase
 
-    // Subword Write — replicate data into correct lanes
+    // Subword Write
     always_comb
         case (Funct3M)
             3'b000: DataInM = {4{WriteDataM[7:0]}};  // SB — byte replicated to all lanes
@@ -84,7 +83,7 @@ module lsu(
             default: DataInM = WriteDataM;
         endcase
 
-    // Byte enables — gated by MemWrite, shifted by address offset
+    // Byte enables
     always_comb
         if (!MemWriteM) WriteByteEn = 4'b0000;
         else case (Funct3M)
