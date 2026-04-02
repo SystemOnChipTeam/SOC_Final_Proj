@@ -150,8 +150,7 @@ module controller(
             end
 
             // BRANCH  (Op = 1100011)
-            // BEQ: if (rs1 == rs2) PC = PC + imm  — Funct3 = 000
-            // BNE: if (rs1 != rs2) PC = PC + imm  — Funct3 = 001
+            // if (rs1 cond rs2) PC = PC + imm
             7'b1100011: begin
                 RegWriteD     = 1'b0;
                 ImmSrcD      = 3'b010;    // B-immediate
