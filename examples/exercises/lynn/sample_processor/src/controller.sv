@@ -36,7 +36,6 @@ module controller(
         JumpD         = 1'b0;
         MemEnD        = 1'b0;
         ALUControlD   = 5'b00000; // ADD
-        BranchTaken = 1'b0;
         CSRSrcD = 1'b0;
 
         case (OpD)
@@ -130,7 +129,7 @@ module controller(
                 MemEnD       = 1'b0;
                 CSRSrcD       = 1'b0;
 
-                case (Funct3)
+                case (Funct3D)
                     3'b000: ALUControlD = 5'b00000; // ADDI
                     3'b001: ALUControlD = 5'b00010; // SLLI
                     3'b010: ALUControlD = 5'b00011; // SLTI
@@ -168,7 +167,7 @@ module controller(
             7'b1100011: begin
                 RegWriteD     = 1'b0;
                 ImmSrcD      = 3'b010;    // B-immediate
-                ALUSrcD       = 1'b1;    // both operands from register file
+                ALUSrcD       = 1'b0;    // both operands from register file
                 ResultSrcD   = 2'b00;
                 MemWriteD    = 1'b0;
                 BranchD       = 1'b1;
@@ -219,8 +218,8 @@ module controller(
             7'b0010111: begin
                 RegWriteD     = 1'b1;
                 ImmSrcD       = 3'b100;   // U-immediate
-                ALUSrcD       = 1'b1;    // SrcA = PC, SrcB = immediate
-                ResultSrcD   = 2'b00;
+                ALUSrcD       = 1'b1;    
+                ResultSrcD   = 2'b11;
                 MemWriteD     = 1'b0;
                 BranchD       = 1'b0;
                 JumpD          = 1'b0;

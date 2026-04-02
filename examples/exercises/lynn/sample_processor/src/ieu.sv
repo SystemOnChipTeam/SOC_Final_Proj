@@ -29,6 +29,7 @@ module ieu(
         input   logic [31:0]    ReadDataW,
         input   logic [31:0]    PCPlus4W,
         input   logic [4:0]     RdW,
+        input   logic [31:0]    PCTargetW,
 
         // Hazard Unit Decode Stage Interface
         output	logic [4:0]		Rs1D, Rs2D,
@@ -68,13 +69,9 @@ module ieu(
 
     //TODO: implement CSR logic and connect to controller and csrfile
     // logic [31:0] CSRReadData, CSRResult;
+    logic  CSRSrcD;
 
-    // TODO: fix controller instantiations and connections
-    // Control logic
-    controller c(.Op(InstrD[6:0]), .Funct3(InstrD[14:12]), .Funct7(InstrD[31:25]), .Flags,
-        .ALUResultSrc, .ResultSrc, .PCSrc,
-        .ALUSrc, .RegWrite, .MemWrite, .ImmSrc, .ALUControl, .MemEn, .CSRSrc
-    );
+    controller c(.clk, .reset, .InstrD, .MemEnD, .RegWriteD, .ResultSrcD, .MemWriteD, .JumpD, .BranchD, .ALUControlD, .ALUSrcD, .ImmSrcD, .CSRSrcD);
 
     // Register file logic
     regfile rf(.clk, .WE3(RegWrite), .A1(InstrD[19:15]), .A2(InstrD[24:20]),

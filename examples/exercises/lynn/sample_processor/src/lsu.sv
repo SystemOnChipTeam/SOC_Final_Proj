@@ -14,6 +14,7 @@ module lsu(
         input   logic   [4:0]   RdE,
         input   logic   [31:0]  PCPlus4E,
         input   logic   [2:0]   Funct3E,
+        input   logic   [31:0]  PCTargetE,
 
         // Hazard Unit interface
         input	logic			StallM, FlushM, StallW, FlushW,
@@ -25,7 +26,7 @@ module lsu(
         output  logic   [1:0]   ResultSrcW,
         output  logic   [31:0]  ALUResultW, ReadDataW, PCPlus4W,
         output  logic   [4:0]   RdW,
-
+        output logic    [31:0]  PCTargetW,
 
 		// DTIM Interface
 		output  logic   [31:0]  ALUResultM,  // data memory target address
@@ -40,6 +41,7 @@ module lsu(
     logic   [1:0]   ResultSrcM;
 	logic	[31:0]	WriteDataM, ReadDataM, PCPlus4M;
 	logic	[2:0]   Funct3M;
+    logic   [31:0]  PCTargetM, PCTargetW;
 	
 	// Pipeline Register M-Stage
     flopenrc #(1)  MemEnMReg    (clk, reset, FlushM, ~StallM, MemEnE,    MemEnM);
@@ -51,6 +53,8 @@ module lsu(
     flopenrc #(3)  Funct3MReg   (clk, reset, FlushM, ~StallM, Funct3E,   Funct3M);
     flopenrc #(5)  RdMReg       (clk, reset, FlushM, ~StallM, RdE,       RdM);
     flopenrc #(32) PCPlus4MReg  (clk, reset, FlushM, ~StallM, PCPlus4E,  PCPlus4M);
+    flopenrc #(32) PCTargetMReg(clk, reset, FlushM, ~StallM, PCTargetE, PCTargetM);
+
 
 	//DTIM Read and Write Logic
 
@@ -99,6 +103,8 @@ module lsu(
     flopenrc #(32) ReadDataWReg (clk, reset, FlushW, ~StallW, ReadDataM, ReadDataW);
     flopenrc #(5)  RdWReg       (clk, reset, FlushW, ~StallW, RdM,       RdW);
     flopenrc #(32) PCPlus4WReg  (clk, reset, FlushW, ~StallW, PCPlus4M,  PCPlus4W);
+    flopenrc #(32) PCTargetWReg(clk, reset, FlushW, ~StallW, PCTargetM, PCTargetW);
+
 
     
 

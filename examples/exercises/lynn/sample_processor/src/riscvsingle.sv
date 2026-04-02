@@ -82,7 +82,7 @@ module riscvsingle (
         .ALUResultM,
         // Writeback stage inputs
         .RegWriteW, .ResultSrcW,
-        .ALUResultW, .ReadDataW, .PCPlus4W, .RdW,
+        .ALUResultW, .ReadDataW, .PCPlus4W, .RdW, .PCTargetW,
         // Hazard unit — Decode
         .Rs1D, .Rs2D,
         // Hazard unit — Execute
@@ -97,14 +97,14 @@ module riscvsingle (
         .clk, .reset,
         // Execute stage inputs
         .MemEnE, .RegWriteE, .ResultSrcE, .MemWriteE,
-        .ALUResultE, .WriteDataE, .RdE, .PCPlus4E, .Funct3E,
+        .ALUResultE, .WriteDataE, .RdE, .PCPlus4E, .Funct3E, .PCTargetE,
         // Hazard unit interface
         .StallM(1'b0), .FlushM(1'b0),
         .StallW(1'b0), .FlushW(1'b0),
         .RdM, .RegWriteM,
         // Writeback outputs to IEU
         .RegWriteW, .ResultSrcW,
-        .ALUResultW, .ReadDataW, .PCPlus4W, .RdW,
+        .ALUResultW, .ReadDataW, .PCPlus4W, .RdW, .PCTargetW,
         // DTIM interface
         .ALUResultM,
         .DataOutM(ReadData),
