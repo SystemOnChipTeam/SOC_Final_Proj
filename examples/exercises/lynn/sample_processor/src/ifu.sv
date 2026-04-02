@@ -5,22 +5,26 @@
 module ifu(
         // Inputs
         input   logic           clk, reset,
-        input   logic           PCSrcE,
-        input   logic [31:0]    PCTargetE,
+        input   logic           PCSrcE,    // Program Counter source, 1 if branch is taken
+        input   logic [31:0]    PCTargetE, // Target address from Execute stage for branch/jump instructions
 
         // Stalls
-        input   logic           StallF, StallD, FlushD,
+        input   logic           StallF,    // stall the Fetch stage
+        input   logic           StallD,    // stall the Decode stage
+        input   logic           FlushD,    // flush the Decode stage
 
         // Outputs
-        output  logic [31:0]    InstrD, PCD, PCPlus4D,
+        output  logic [31:0]    InstrD,    // Instruction in Decode stage
+        output  logic [31:0]    PCD,       // Program Counter in Decode stage
+        output  logic [31:0]    PCPlus4D,  // PC+4 in Decode stage (for JAL)
 
         // Memory interface
-        output  logic [31:0]    PCF,
-        input   logic [31:0]    InstrF
+        output  logic [31:0]    PCF,       // Program Counter in Fetch stage
+        input   logic [31:0]    InstrF     // Instruction from memory in Fetch stage
     );
 
-    logic   [31:0]  PCNext, PCPlus4F;
-    logic   [31:0]  entry_addr;
+    logic   [31:0]  PCNext, PCPlus4F; // Next PC value and PC+4 in Fetch stage
+    logic   [31:0]  entry_addr; // Address to jump to on reset, set by plusarg
 
     initial begin
         // default
