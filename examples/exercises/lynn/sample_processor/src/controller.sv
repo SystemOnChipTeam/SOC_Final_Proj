@@ -12,7 +12,7 @@ module controller(
     output logic [1:0]  ResultSrcD,                // Selects value to write to register file: 00 = ALU result, 01 = ReadData, 10 = PC+4, 11 = PCTarget (for AUIPC)
     output logic        MemWriteD, JumpD, BranchD, // control signals for memory write, jump, and branch instructions
     output logic [4:0]  ALUControlD,               // ALU control signals
-    output logic        ALUSrcD,                   // 1 chooses ImmExt, O chooses WriteData. Using 0th bit from old processor
+    output logic        ALUSrcD,                   // 1 chooses ImmExt, O chooses WriteData
     output logic [2:0]  ImmSrcD,                   // Type of immediate extension
     output logic        CSRSrcD                    // 1 selects CSR result for writing to rd, 0 selects ALU result
 );

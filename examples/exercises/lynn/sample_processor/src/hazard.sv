@@ -6,24 +6,24 @@
 module hazard(
     // Inputs
         input   logic           clk, reset,
-        input   logic [4:0]     Rs1D, Rs2D,
-        input   logic [4:0]     Rs1E, Rs2E,
-        input   logic [4:0]     RdE,
+        input   logic [4:0]     Rs1D, Rs2D, // source registers in Decode stage
+        input   logic [4:0]     Rs1E, Rs2E, // source registers in Execute stage
+        input   logic [4:0]     RdE,        // destination register in Execute stage
         input   logic           PCSrcE, // 1 if branch is taken
         input   logic           ResultSrcE0, // 1 if lw is in execute stage
-        input   logic [4:0]     RdM,
-        input   logic           RegWriteM,
-        input   logic           RegWriteW,
-        input   logic [4:0]     RdW,
+        input   logic [4:0]     RdM,        // destination register in Memory stage
+        input   logic           RegWriteM,  // 1 if instruction in Memory stage writes to register file
+        input   logic           RegWriteW,  // 1 if instruction in Writeback stage writes to register file
+        input   logic [4:0]     RdW,        // destination register in Writeback stage
 
 
         // Outputs
-        output  logic           StallF,
-        output  logic           StallD, FlushD,
-        output  logic           StallE, FlushE,
-        output  logic [1:0]     ForwardAE, ForwardBE,
-        output  logic           StallM, FlushM,
-        output  logic           StallW, FlushW
+        output  logic           StallF, // stall the Fetch stage
+        output  logic           StallD, FlushD, // stall and flush the Decode stage
+        output  logic           StallE, FlushE, // stall and flush the Execute stage
+        output  logic [1:0]     ForwardAE, ForwardBE, // forwarding controls for ALU src A and B in Execute stage
+        output  logic           StallM, FlushM, // stall and flush the Memory stage
+        output  logic           StallW, FlushW // stall and flush the Writeback stage
 );
     // TODO: We don't use clk or reset in this module,  can remove them if we don't need them.
     // TODO: M and W stage stalls and flushes are not needed for this processor, can remove them if we don't need them.
