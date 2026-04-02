@@ -1,17 +1,19 @@
-
+// lsu.sv
+// RISC-V pipelined processor
+// pclark@hmc.edu mconine@hmc.edu 2026
 
 module lsu(
 		// Inputs
         input   logic           clk, reset,
-        input   logic           MemEnM,
+        input   logic           MemEnE,
 		input	logic	        RegWriteE,
         input	logic   [1:0]	ResultSrcE, 
-        input	logic           MemWriteM,
-		input	logic			ALUResultE,
-		input	logic			WriteDataE,
-		input	logic 			RdE,
-        input	logic 			PCPlus4E,
-		input	logic			Funct3E,
+        input	logic           MemWriteE,
+		input   logic   [31:0]  ALUResultE,
+        input   logic   [31:0]  WriteDataE,
+        input   logic   [4:0]   RdE,
+        input   logic   [31:0]  PCPlus4E,
+        input   logic   [2:0]   Funct3E,
 
         // Hazard Unit interface
         input	logic			StallM, FlushM, StallW, FlushW,
@@ -21,37 +23,34 @@ module lsu(
 		// Outputs
         output  logic	        RegWriteW, 
         output  logic   [1:0]   ResultSrcW,
-        output  logic   [31:0]  ALUResultW, ReadDataW, RdW, PCPlus4W
+        output  logic   [31:0]  ALUResultW, ReadDataW, PCPlus4W,
+        output  logic   [4:0]   RdW,
+
 
 		// DTIM Interface
 		output  logic   [31:0]  ALUResultM,  // data memory target address
         input   logic   [31:0]  DataOutM, // data memory read data
         output  logic   [31:0]  DataInM, // data memory write data
 
-        output  logic           MemEn,
-        output  logic   [1:0]   MemWriteM,
+        output  logic           MemEnM, MemWriteM,
         output  logic   [3:0]   WriteByteEn  // strobes, 1 hot stating weather a byte should be written on a store
     );
 
-	logic 			MemEnM, RegWriteM;
-    logic   [1:0]   ResultSrcM, MemWriteM;
-	logic	[31:0]	ALUResultM, WriteDataM, DataInM, DataOutM, ReadDataM, RdM, PCPlus4M;
+    // Declare internal signals
+    logic   [1:0]   ResultSrcM;
+	logic	[31:0]	WriteDataM, ReadDataM, PCPlus4M;
 	logic	[2:0]   Funct3M;
-	logic	[31:0]	DataOutM;
 	
 	// Pipeline Register M-Stage
-    flopenrc #(1) RD1EReg(clk, reset, FlushM, ~StallM, MemEnE, MemEnM);
-	flopenrc #(1) RD1EReg(clk, reset, FlushM, ~StallM, RegWriteE, RegWriteM);
-	flopenrc #(2) RD1EReg(clk, reset, FlushM, ~StallM, ResultSrcE, ResultSrcM);
-	flopenrc #(2) RD1EReg(clk, reset, FlushM, ~StallM, MemWriteE, MemWriteM);
-
-	flopenrc #(32) RD1EReg(clk, reset, FlushM, ~StallM, ALUResultE, ALUResultM);
-	flopenrc #(32) RD1EReg(clk, reset, FlushM, ~StallM, WriteDataE, WriteDataM);
-
-	flopenrc #(32) RD1EReg(clk, reset, FlushM, ~StallM, Funct3E, Funct3M);
-	flopenrc #(32) RD1EReg(clk, reset, FlushM, ~StallM, RdE, RdM);
-	flopenrc #(32) RD1EReg(clk, reset, FlushM, ~StallM, PCPlus4E, PCPlus4M);
-
+    flopenrc #(1)  MemEnMReg    (clk, reset, FlushM, ~StallM, MemEnE,    MemEnM);
+    flopenrc #(1)  RegWriteMReg (clk, reset, FlushM, ~StallM, RegWriteE, RegWriteM);
+    flopenrc #(2)  ResultSrcMReg(clk, reset, FlushM, ~StallM, ResultSrcE,ResultSrcM);
+    flopenrc #(1)  MemWriteMReg (clk, reset, FlushM, ~StallM, MemWriteE, MemWriteM);
+    flopenrc #(32) ALUResultMReg(clk, reset, FlushM, ~StallM, ALUResultE,ALUResultM);
+    flopenrc #(32) WriteDataMReg(clk, reset, FlushM, ~StallM, WriteDataE,WriteDataM);
+    flopenrc #(3)  Funct3MReg   (clk, reset, FlushM, ~StallM, Funct3E,   Funct3M);
+    flopenrc #(5)  RdMReg       (clk, reset, FlushM, ~StallM, RdE,       RdM);
+    flopenrc #(32) PCPlus4MReg  (clk, reset, FlushM, ~StallM, PCPlus4E,  PCPlus4M);
 
 	//DTIM Read and Write Logic
 
@@ -92,13 +91,11 @@ module lsu(
 
 
 	// Writeback Stage Pipeline Register 
-	flopenrc #(1) RD1EReg(clk, reset, FlushW, ~StallW, RegWriteM, RegWriteW);
-	flopenrc #(2) RD1EReg(clk, reset, FlushW, ~StallW, ResultSrcM, ResultSrcW);
-
-	flopenrc #(32) RD1EReg(clk, reset, FlushW, ~StallW, ALUResultM, ALUResultW);
-	flopenrc #(32) RD1EReg(clk, reset, FlushW, ~StallW, ReadDataM, ReadDataW);
-
-	flopenrc #(32) RD1EReg(clk, reset, FlushW, ~StallW, RdM, RdW);
-    flopenrc #(32) RD1EReg(clk, reset, FlushW, ~StallW, PCPlus4M, PCPlus4W);
+	flopenrc #(1)  RegWriteWReg (clk, reset, FlushW, ~StallW, RegWriteM, RegWriteW);
+    flopenrc #(2)  ResultSrcWReg(clk, reset, FlushW, ~StallW, ResultSrcM,ResultSrcW);
+    flopenrc #(32) ALUResultWReg(clk, reset, FlushW, ~StallW, ALUResultM,ALUResultW);
+    flopenrc #(32) ReadDataWReg (clk, reset, FlushW, ~StallW, ReadDataM, ReadDataW);
+    flopenrc #(5)  RdWReg       (clk, reset, FlushW, ~StallW, RdM,       RdW);
+    flopenrc #(32) PCPlus4WReg  (clk, reset, FlushW, ~StallW, PCPlus4M,  PCPlus4W);
 
 endmodule

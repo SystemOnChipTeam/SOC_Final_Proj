@@ -1,5 +1,5 @@
-// riscvsingle.sv
-// RISC-V single-cycle processor
+// ifu.sv
+// RISC-V pipelined processor
 // pclark@hmc.edu mconine@hmc.edu 2026
 
 module ifu(
