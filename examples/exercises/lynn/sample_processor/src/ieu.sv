@@ -65,7 +65,7 @@ module ieu(
     logic        BranchTaken;
     logic [31:0] BranchTargetE;
 
-    // Writeback Stage internal signals
+    // Writeback
     logic [31:0] ResultW;
 
     // Combinational assignments
@@ -73,9 +73,26 @@ module ieu(
     assign Rs1D = InstrD[19:15];
     assign Rs2D = InstrD[24:20];
 
-    logic  CSRSrcD;
+    logic        CSRSrcD;
+    logic [31:0] CSRReadDataD, CSRReadDataE;
+    logic        CSRSrcE;
 
     controller c(.clk, .reset, .InstrD, .MemEnD, .RegWriteD, .ResultSrcD, .MemWriteD, .JumpD, .BranchD, .ALUControlD, .ALUSrcD, .ImmSrcD, .CSRSrcD);
+
+    // TODO could move csr to other stage if blocking
+    csrfile csr(
+        .clk(clk),
+        .reset(reset),
+        .CSRWrite(CSRSrcD),
+        .CSRAdr(InstrD[31:20]),
+        .RS1(Rd1D),
+        .RetiredInstr(~StallE & ~FlushE),
+        .Op(InstrD[6:0]),
+        .Funct3(InstrD[14:12]),
+        .Funct7(InstrD[31:25]),
+        .PCSrc(BranchTaken),
+        .CSRReadData(CSRReadDataD)
+    );
 
     // Register file logic
     regfile rf(.clk, .WE3(RegWriteW), .A1(InstrD[19:15]), .A2(InstrD[24:20]),
@@ -84,6 +101,7 @@ module ieu(
     // extender
     extend ext(.Instr(InstrD[31:7]), .ImmSrc(ImmSrcD), .ImmExt(ImmExtD));
 
+    // TODO make struct for these
     // Pipeline Register E-Stage
     flopenrc #(1) MemEnEReg    (clk, reset, FlushE, ~StallE, MemEnD,     MemEnE);
     flopenrc #(1) RegWriteEReg (clk, reset, FlushE, ~StallE, RegWriteD,  RegWriteE);
@@ -94,6 +112,8 @@ module ieu(
     flopenrc #(5) ALUControlEReg(clk, reset, FlushE, ~StallE, ALUControlD, ALUControlE);
     flopenrc #(1) ALUSrcEReg   (clk, reset, FlushE, ~StallE, ALUSrcD,    ALUSrcE);
     flopenrc #(1) JalrEReg     (clk, reset, FlushE, ~StallE, JalrD,      JalrE);
+    flopenrc #(1)  CSRSrcEReg     (clk, reset, FlushE, ~StallE, CSRSrcD,      CSRSrcE);
+    flopenrc #(32) CSRReadDataEReg(clk, reset, FlushE, ~StallE, CSRReadDataD, CSRReadDataE);
 
     // Datapath registers
     flopenrc #(32) RD1EReg(clk, reset, FlushE, ~StallE, Rd1D, Rd1E);
@@ -112,11 +132,15 @@ module ieu(
     mux3 #(32) ForwardmuxB(Rd2E, ResultW, ALUResultM, ForwardBE, WriteDataE);
 
     // Comparator and ALU
-    logic [31:0] ALUOutE; // wire for raw ALU calculation
+    logic [31:0] ALUResult_Raw;
 
     mux2 #(32) srcbmux(WriteDataE, ImmExtE, ALUSrcE, SrcBE);
     cmp comparator(.SrcA(SrcAE), .SrcB(SrcBE), .Flags(FlagsE));
-    alu alu(SrcAE, SrcBE, ALUControlE, ALUOutE);
+    alu alu(SrcAE, SrcBE, ALUControlE, ALUResult_Raw);
+
+    // Overwrite the ALU result with CSR data if this is a CSR instruction
+    logic [31:0] ALUOutE;
+    assign ALUOutE = CSRSrcE ? CSRReadDataE : ALUResult_Raw;
 
     // Branch/Jump Target Logic
     adder pcadder(PCE, ImmExtE, BranchTargetE);
@@ -124,11 +148,10 @@ module ieu(
     // Select ALUResult for JALR, otherwise normal Branch/JAL target
     assign PCTargetE = JalrE ? (ALUOutE & 32'hFFFFFFFE) : BranchTargetE;
 
-    // Bypass the raw ALU output for instructions that don't use it.
-    // This guarantees the M-stage forwarding path always provides the correct destination value.
+    // Output the final ALUResultE to the rest of the pipeline
     assign ALUResultE = (ResultSrcE == 2'b11) ? PCTargetE : // AUIPC
                         (ResultSrcE == 2'b10) ? PCPlus4E  : // JAL / JALR
-                        ALUOutE;                            // LW / SW / R-Type / I-Type
+                        ALUOutE;                            // LW / SW / R-Type / I-Type / CSR
 
     always_comb
         case (Funct3E)

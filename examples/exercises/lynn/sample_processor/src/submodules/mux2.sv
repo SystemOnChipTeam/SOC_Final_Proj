@@ -1,0 +1,11 @@
+// mux.sv
+// RISC-V pipelined processor
+// pclark@hmc.edu mconine@hmc.edu 2026
+
+module mux2 #(parameter WIDTH = 8) (
+  input  logic [WIDTH-1:0] d0, d1,
+  input  logic             s,
+  output logic [WIDTH-1:0] y);
+
+  assign y = s ? d1 : d0;
+endmodule

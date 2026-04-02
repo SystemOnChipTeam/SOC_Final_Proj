@@ -36,7 +36,7 @@ module ifu(
     mux2 #(32) pcmux(PCPlus4F, PCTargetE, PCSrcE, PCNext);
 
     // PC Register with Reset to entry_addr and Enable (StallF)
-    always_ff @(posedge clk or posedge reset) begin
+    always_ff @(posedge clk) begin
         if (reset)          PCF <= entry_addr;
         else if (~StallF)   PCF <= PCNext;
     end
