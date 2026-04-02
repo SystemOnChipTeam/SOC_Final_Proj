@@ -5,16 +5,20 @@ module ieu(
         input   logic           clk, reset,
         input   logic [31:0]    InstrD,
         input   logic [31:0]    PCD,
-        input   logic [31:0]    PCPLus4D,
+        input   logic [31:0]    PCPlus4D,
 
         // Outputs Execute Stage
 		output	logic	        MemEnE, RegWriteE,
         output  logic [1:0]     ResultSrcE, 
         output  logic           MemWriteE,
-		output	logic			ALUResultE,
-		output	logic			WriteDataE,
-		output	logic			Funct3E
+		output	logic [31:0]	ALUResultE,
+		output	logic [31:0]	WriteDataE,
+		output	logic [2:0]		Funct3E,
         output  logic [31:0]    PCPlus4E,
+        output  logic [31:0]    PCTargetE,
+
+        // Inputs Memory Stage
+        input logic [31:0] ALUResultM,
 
         // Inputs Writeback Stage
         input   logic           RegWriteW, 
@@ -24,36 +28,46 @@ module ieu(
         input   logic [31:0]    PCPlus4W,
         input   logic [4:0]     RdW,
 
-        // Outputs Writeback Stage
-        output  logic [31:0]    ResultW,
-
         // Hazard Unit Decode Stage Interface
         output	logic [4:0]		Rs1D, Rs2D,
-        output	logic [4:0]		InstrD,
 
         // Hazard Unit Execute Stage Interface
 		input 	logic			StallE, FlushE, 
 		input	logic [1:0]		ForwardAE, ForwardBE,
 		output	logic [4:0]		Rs1E, Rs2E, RdE, 
-		output	logic			PCSrcE, // 1 if branch is taken
-		output	logic 			ResultSrcE0, // 1 if lw is in execute stage
+		output	logic			PCSrcE, 
+		output	logic 			ResultSrcE0
     );
 
-    logic RegWrite, MemWrite, Jump, ALUResultSrc, ResultSrc,CSRSrc;
-    logic [1:0] ALUSrc;
-    logic [2:0] Flags;
-    logic [2:0] ImmSrc;
-    logic [4:0] ALUControl;
+    // Decode Stade internal signals
+    // Controller outputs (D-Stage)
+    logic        MemEnD, RegWriteD, MemWriteD;
+    logic [1:0]  ResultSrcD;
+    logic        JumpD, BranchD, ALUSrcD;
+    logic [2:0]  ALUControlD, ImmSrcD;
+    // Datapath (D-stage)
+    logic [31:0] Rd1D, Rd2D, ImmExtD;
 
-	logic [31:0] ImmExt;
-    logic [31:0] R1, R2, SrcA, SrcB;
-    logic [31:0] ALUResult, IEUResult, Result;
-    logic [7:0]  ByteM;
-    logic [15:0] HalfwordM;
-    logic [31:0] LoadData;
-    logic [31:0] CSRReadData, CSRResult;
+    // Execute Stage internal signals
+    logic [31:0] Rd1E, Rd2E, PCE, ImmExtE;
+    logic        JumpE, BranchE, ALUSrcE;
+    logic [2:0]  ALUControlE;
+    logic [31:0] SrcAE, SrcBE;
+    logic [2:0]  FlagsE;
+    logic BranchTaken;
 
-    // TODO: fix instantiations and connections
+    // Writeback Stage internal signals
+    logic [31:0] ResultW;
+
+    // Combinational assignments
+    assign ResultSrcE0 = ResultSrcE[0];
+    assign Rs1D = InstrD[19:15];
+    assign Rs2D = InstrD[24:20];
+
+    //TODO: implement CSR logic and connect to controller and csrfile
+    // logic [31:0] CSRReadData, CSRResult;
+
+    // TODO: fix controller instantiations and connections
     // Control logic
     controller c(.Op(InstrD[6:0]), .Funct3(InstrD[14:12]), .Funct7(InstrD[31:25]), .Flags,
         .ALUResultSrc, .ResultSrc, .PCSrc,
@@ -62,7 +76,7 @@ module ieu(
 
     // Register file logic
     regfile rf(.clk, .WE3(RegWrite), .A1(InstrD[19:15]), .A2(InstrD[24:20]),
-        .A3(InstrD[11:7]), .WD3(Result), .RD1(R1), .RD2(R2));
+        .A3(RdW), .WD3(ResultW), .RD1(Rd1D), .RD2(Rd2D));
 
     // TODO: keep this?
     // //csrfile
@@ -70,49 +84,57 @@ module ieu(
     //     .RS1(R1), .RetiredInstr(~reset), .Op(InstrD[6:0]), .Funct3(InstrD[14:12]), .Funct7(InstrD[31:25]), .PCSrc,.CSRReadData);
 
     // extender blender chicken nuggets remember
-    extend ext(.Instr(InstrD[31:7]), .ImmSrcD, .ImmExtD);
+    extend ext(.Instr(InstrD[31:7]), .ImmSrc(ImmSrcD), .ImmExt(ImmExtD));
 
-	// Pipeline Register E-Stage 
-	flopenrc #(_)  Rs1EReg(clk, reset, FlushE, ~StallE, 
-	{RegWriteD, ResultSrcD, MemRWD, ALUResultSrcD, JumpD, ALUControlD, ALUSrcD},
-	{RegWriteE, ResultSrcE, MemRWE, ALUResultSrcE, JumpE, ALUControlE, ALUSrcE});
+	// Pipeline Register E-Stage
+    // Controller registers
+    flopenrc #(1) MemEnEReg    (clk, reset, FlushE, ~StallE, MemEnD,     MemEnE);
+    flopenrc #(1) RegWriteEReg (clk, reset, FlushE, ~StallE, RegWriteD,  RegWriteE);
+    flopenrc #(2) ResultSrcEReg(clk, reset, FlushE, ~StallE, ResultSrcD, ResultSrcE);
+    flopenrc #(1) MemWriteEReg (clk, reset, FlushE, ~StallE, MemWriteD,  MemWriteE);
+    flopenrc #(1) JumpEReg     (clk, reset, FlushE, ~StallE, JumpD,      JumpE);
+    flopenrc #(1) BranchEReg   (clk, reset, FlushE, ~StallE, BranchD,    BranchE);
+    flopenrc #(5) ALUControlEReg(clk, reset, FlushE, ~StallE, ALUControlD, ALUControlE);
+    flopenrc #(1) ALUSrcEReg   (clk, reset, FlushE, ~StallE, ALUSrcD,    ALUSrcE);
 
-	flopenrc #(32) RD1EReg(clk, reset, FlushE, ~StallE, PCD, PCE);
-
+    // Datapath registers
 	flopenrc #(32) RD1EReg(clk, reset, FlushE, ~StallE, Rd1D, Rd1E);
   	flopenrc #(32) RD2EReg(clk, reset, FlushE, ~StallE, Rd2D, Rd2E);
+	flopenrc #(32) PCEReg(clk, reset, FlushE, ~StallE, PCD, PCE);
+    flopenrc #(5)  Rs1EReg(clk, reset, FlushE, ~StallE, InstrD[19:15], Rs1E);
+    flopenrc #(5)  Rs2EReg(clk, reset, FlushE, ~StallE, InstrD[24:20], Rs2E);
+    flopenrc #(5)  RdEReg(clk, reset, FlushE, ~StallE, InstrD[11:7], RdE);
 
-	flopenrc #(5)  Rs1EReg(clk, reset, FlushE, ~StallE, ImmExtD, ImmExtE);
-	flopenrc #(5)  Rs2EReg(clk, reset, FlushE, ~StallE, Funct3D, Funct3E);
-	flopenrc #(5)  RdEReg(clk, reset, FlushE, ~StallE, RdD, RdE);
-
+	flopenrc #(32) ImmExtEReg(clk, reset, FlushE, ~StallE, ImmExtD, ImmExtE);
+    flopenrc #(32) PCPlus4EReg(clk, reset, FlushE, ~StallE, PCPlus4D, PCPlus4E);
+    flopenrc #(3)  Funct3EReg(clk, reset, FlushE, ~StallE, InstrD[14:12], Funct3E);
+	
 	// Datapath
-	mux3 #(32) ieuresultmux(.Rd1E, .ResultW, .IEUResultM, .ForwardAE, .FSrcAE);
-	mux3 #(32) ieuresultmux(.Rd2E, .ResultW, .IEUResultM, .ForwardBE, .FSrcBE);
+	mux3 #(32) ForwardmuxA(Rd1E, ALUResultM, ResultW, ForwardAE, SrcAE);
+    mux3 #(32) ForwardmuxB(Rd2E, ALUResultM, ResultW, ForwardBE, WriteDataE);
 
     // Comparitor and ALU
-    cmp cmp(.FSrcAE, .FSrcBE, .FlagsE);
-
-    mux2 #(32) srcamux(FSrcAE, PCE, ALUSrcE[0], SrcAE); // TODO set the ALUSrcE toggle bits
-    mux2 #(32) srcbmux(FSrcBE, ImmExtE, ALUSrcE[1], SrcBE);
-
-    alu alu(.SrcAE, .SrcBE, .ALUControlE, .ALUResultE, .IEUAdrE);
+    mux2 #(32) srcbmux(WriteDataE, ImmExtE, ALUSrcE, SrcBE);
+    cmp comparator(.SrcAE(SrcAE), .SrcBE(SrcBE), .FlagsE(FlagsE));
+    alu alu(.SrcAE, .SrcBE, .ALUControlE, .ALUResultE);
 
     adder pcadder(PCE, ImmExtE, PCTargetE);
 
-    // TODO: Branch Logic Block
-    logic BranchTaken;
-    case (Funct3)
-                    3'b000: BranchTaken = FlagsE[0];   // BEQ  — equal
-                    3'b001: BranchTaken = ~FlagsE[0];  // BNE  — not equal
-                    3'b100: BranchTaken = FlagsE[1];   // BLT  — signed less than
-                    3'b101: BranchTaken = ~FlagsE[1];  // BGE  — signed greater or equal (not less than)
-                    3'b110: BranchTaken = FlagsE[2];   // BLTU — unsigned less than
-                    3'b111: BranchTaken = ~FlagsE[2];  // BGEU — unsigned greater or equal (not less than)
-                    default: BranchTaken = 1'b0;
-    endcase
+    always_comb
+        case (Funct3E)
+                        3'b000: BranchTaken = FlagsE[0];   // BEQ  — equal
+                        3'b001: BranchTaken = ~FlagsE[0];  // BNE  — not equal
+                        3'b100: BranchTaken = FlagsE[1];   // BLT  — signed less than
+                        3'b101: BranchTaken = ~FlagsE[1];  // BGE  — signed greater or equal (not less than)
+                        3'b110: BranchTaken = FlagsE[2];   // BLTU — unsigned less than
+                        3'b111: BranchTaken = ~FlagsE[2];  // BGEU — unsigned greater or equal (not less than)
+                        default: BranchTaken = 1'b0;
+        endcase
 
     assign PCSrcE = (BranchE & BranchTaken) | JumpE;
 
-    
+    // TODO: add CSR logic and connect to controller and csrfile
+    // Writeback mux
+    mux3 #(32) resultmux(ALUResultW, ReadDataW, PCPlus4W, ResultSrcW, ResultW);
+
 endmodule

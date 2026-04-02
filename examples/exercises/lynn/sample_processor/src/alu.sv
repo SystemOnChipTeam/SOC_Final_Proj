@@ -4,7 +4,7 @@
 module alu(
     input  logic [31:0] SrcA, SrcB,
     input  logic [4:0]  ALUControl,
-    output logic [31:0] ALUResult, IEUAdr
+    output logic [31:0] ALUResult
 );
 
     // Adder / Subtractor
@@ -17,7 +17,6 @@ module alu(
 
     assign CondInvB = Sub ? ~SrcB : SrcB;
     assign Sum      = SrcA + CondInvB + {31'b0, Sub};
-    assign IEUAdr   = Sum;
 
     // Signed less-than (SLT) — overflow-aware
     logic Overflow, Neg, LT;
