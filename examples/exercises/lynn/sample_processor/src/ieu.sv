@@ -43,7 +43,6 @@ module ieu(
     );
 
     // Decode Stage internal signals
-    // Controller outputs (D-Stage)
     logic        MemEnD, RegWriteD, MemWriteD;
     logic [1:0]  ResultSrcD;
     logic        JumpD, BranchD, ALUSrcD;
@@ -86,7 +85,6 @@ module ieu(
     extend ext(.Instr(InstrD[31:7]), .ImmSrc(ImmSrcD), .ImmExt(ImmExtD));
 
     // Pipeline Register E-Stage
-    // Controller registers
     flopenrc #(1) MemEnEReg    (clk, reset, FlushE, ~StallE, MemEnD,     MemEnE);
     flopenrc #(1) RegWriteEReg (clk, reset, FlushE, ~StallE, RegWriteD,  RegWriteE);
     flopenrc #(2) ResultSrcEReg(clk, reset, FlushE, ~StallE, ResultSrcD, ResultSrcE);
@@ -109,22 +107,28 @@ module ieu(
     flopenrc #(32) PCPlus4EReg(clk, reset, FlushE, ~StallE, PCPlus4D, PCPlus4E);
     flopenrc #(3)  Funct3EReg(clk, reset, FlushE, ~StallE, InstrD[14:12], Funct3E);
 
-    // Datapath
-    // FIXED: Swapped ALUResultM and ResultW.
-    // 00 = Rd (Decode), 01 = ResultW (Writeback), 10 = ALUResultM (Memory)
+    // Datapath Forwarding
     mux3 #(32) ForwardmuxA(Rd1E, ResultW, ALUResultM, ForwardAE, SrcAE);
     mux3 #(32) ForwardmuxB(Rd2E, ResultW, ALUResultM, ForwardBE, WriteDataE);
 
     // Comparator and ALU
+    logic [31:0] ALUOutE; // wire for raw ALU calculation
+
     mux2 #(32) srcbmux(WriteDataE, ImmExtE, ALUSrcE, SrcBE);
     cmp comparator(.SrcA(SrcAE), .SrcB(SrcBE), .Flags(FlagsE));
-    alu alu(SrcAE, SrcBE, ALUControlE, ALUResultE);
+    alu alu(SrcAE, SrcBE, ALUControlE, ALUOutE);
 
     // Branch/Jump Target Logic
     adder pcadder(PCE, ImmExtE, BranchTargetE);
 
     // Select ALUResult for JALR, otherwise normal Branch/JAL target
-    assign PCTargetE = JalrE ? (ALUResultE & 32'hFFFFFFFE) : BranchTargetE;
+    assign PCTargetE = JalrE ? (ALUOutE & 32'hFFFFFFFE) : BranchTargetE;
+
+    // Bypass the raw ALU output for instructions that don't use it.
+    // This guarantees the M-stage forwarding path always provides the correct destination value.
+    assign ALUResultE = (ResultSrcE == 2'b11) ? PCTargetE : // AUIPC
+                        (ResultSrcE == 2'b10) ? PCPlus4E  : // JAL / JALR
+                        ALUOutE;                            // LW / SW / R-Type / I-Type
 
     always_comb
         case (Funct3E)
@@ -137,7 +141,6 @@ module ieu(
             default: BranchTaken = 1'b0;
         endcase
 
-    // Force PCSrcE high if a JALR, JAL, or taken Branch is executing
     assign PCSrcE = (BranchE & BranchTaken) | JumpE | JalrE;
 
     // Writeback mux

@@ -29,7 +29,8 @@ module hazard(
     // TODO: M and W stage stalls and flushes are not needed for this processor, can remove them if we don't need them.
 
     logic lwStall;
-    assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE)); // stalled due to lw dependency
+    // old: assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE)); // stalled due to lw dependency
+    assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE)) & (RdE != 5'b0);
 
     assign StallF = lwStall;
     assign StallD = lwStall;

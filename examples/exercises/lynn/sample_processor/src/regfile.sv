@@ -1,6 +1,5 @@
-// riscvsingle.sv
-// RISC-V single-cycle processor
-// David_Harris@hmc.edu 2020
+// regfile.sv
+// RISC-V pipelined processor
 
 module regfile(
         input   logic           clk,
@@ -12,13 +11,18 @@ module regfile(
 
     logic [31:0] rf[31:1];
 
-    // three ported register file
-    // read two ports combinationally (A1/RD1, A2/RD2)
-    // write third port on rising edge of clock (A3/WD3/WE3)
-    // register 0 hardwired to 0
-    always_ff @(posedge clk)
-        if (WE3) rf[A3] <= WD3;
+    // Write on rising edge of clock (protect against writing to x0)
+    always_ff @(posedge clk) begin
+        if (WE3 && A3 != 5'b0) rf[A3] <= WD3;
+    end
 
-    assign RD1 = (A1 != 0) ? rf[A1] : 0;
-    assign RD2 = (A2 != 0) ? rf[A2] : 0;
+    // Internal Forwarding: Read new data if writing to the same register this cycle
+    assign RD1 = (A1 == 5'b0) ? 32'b0 :
+                 ((A1 == A3) && WE3) ? WD3 :
+                 rf[A1];
+
+    assign RD2 = (A2 == 5'b0) ? 32'b0 :
+                 ((A2 == A3) && WE3) ? WD3 :
+                 rf[A2];
+
 endmodule
