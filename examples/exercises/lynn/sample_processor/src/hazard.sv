@@ -19,12 +19,14 @@ module hazard(
 
 		// Outputs
 		output	logic	        StallF,
-		output	logic			StallD, FlushD
-		output	logic			StallE, FlushE
+		output	logic			StallD, FlushD,
+		output	logic			StallE, FlushE,
 		output	logic [1:0]		ForwardAE, ForwardBE,
         output	logic           StallM, FlushM, 
         output	logic           StallW, FlushW
-)
+);
+    // TODO: We don't use clk or reset in this module, but you may need them for more complex hazard logic. You can remove them if you don't need them.
+    // TODO: M and W stage stalls and flushes are not needed for this simple processor. You can remove them if you don't need them.
 
 	logic lwStall;
 	assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE)); // stalled due to lw dependency
@@ -48,6 +50,5 @@ module hazard(
         else if (((Rs2E == RdW) & RegWriteW) & (Rs2E != 5'b0)) ForwardBE = 2'b01; // forward from Writeback stage
         else                                                   ForwardBE = 2'b00; // no forwarding, RS2E goes through
     end
-
 
 endmodule
