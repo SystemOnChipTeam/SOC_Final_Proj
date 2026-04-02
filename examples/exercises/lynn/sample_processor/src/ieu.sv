@@ -80,18 +80,7 @@ module ieu(
     controller c(.clk, .reset, .InstrD, .MemEnD, .RegWriteD, .ResultSrcD, .MemWriteD, .JumpD, .BranchD, .ALUControlD, .ALUSrcD, .ImmSrcD, .CSRSrcD);
 
     // TODO could move csr to other stage if blocking
-    csrfile csr(
-        .clk(clk),
-        .reset(reset),
-        .CSRWrite(CSRSrcD),
-        .CSRAdr(InstrD[31:20]),
-        .RS1(Rd1D),
-        .RetiredInstr(~StallE & ~FlushE),
-        .Op(InstrD[6:0]),
-        .Funct3(InstrD[14:12]),
-        .Funct7(InstrD[31:25]),
-        .PCSrc(BranchTaken),
-        .CSRReadData(CSRReadDataD)
+    csrfile csr(.clk(clk), .reset(reset), .CSRWrite(CSRSrcD), .CSRAdr(InstrD[31:20]), .RS1(Rd1D), .RetiredInstr(~StallE & ~FlushE), .Op(InstrD[6:0]), .Funct3(InstrD[14:12]), .Funct7(InstrD[31:25]), .PCSrc(BranchTaken), .CSRReadData(CSRReadDataD)
     );
 
     // Register file logic
