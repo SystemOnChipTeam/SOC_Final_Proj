@@ -1,6 +1,6 @@
 // hazard.sv
-// RISC-V multi-cycle processor
-// Max Conine and Pierce Clark
+// RISC-V pipelined processor
+// pclark@hmc.edu mconine@hmc.edu 2026
 
 
 module hazard(

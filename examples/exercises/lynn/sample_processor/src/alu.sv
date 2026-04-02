@@ -1,5 +1,6 @@
 // alu.sv
-// RISC-V single-cycle ALU
+// RISC-V pipelined processor
+// pclark@hmc.edu mconine@hmc.edu 2026
 
 module alu(
     input  logic [31:0] SrcA, SrcB,

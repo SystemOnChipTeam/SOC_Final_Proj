@@ -1,4 +1,6 @@
 // ieu.sv
+// RISC-V pipelined processor
+// pclark@hmc.edu mconine@hmc.edu 2026
 
 module ieu(
 		// Inputs Decode Stage

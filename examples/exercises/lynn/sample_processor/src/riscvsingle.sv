@@ -1,6 +1,6 @@
 // riscvsingle.sv
-// RISC-V multi-cycle processor
-// Max Conine and Pierce Clark
+// RISC-V pipelined processor
+// pclark@hmc.edu mconine@hmc.edu 2026
 
 `include "parameters.svh"
 
@@ -57,9 +57,6 @@ module riscvsingle (
     	//outputs
 		.RegWriteW, .ResultSrcW, .IEUResultW, .IEUResultM, .ReadDataW, .RdW
     );
-
-    //pipeline registers
-
 
     hazard hzu();
 
