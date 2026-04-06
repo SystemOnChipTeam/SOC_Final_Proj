@@ -2,6 +2,7 @@
 // RISC-V CSR Register File
 // Supports Zicntr compliance and Custom Telemetry
 
+// TODO parameterize this to optimize area for coremark test.
 module csrfile(
     input  logic        clk, reset,
     input  logic        CSRWrite,           // (Unused - Counters are Read-Only)

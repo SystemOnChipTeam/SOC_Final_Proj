@@ -11,7 +11,7 @@ module controller(
     output logic        MemEnD, RegWriteD,         // MemEnD for load/store, RegWriteD for register file write enable
     output logic [1:0]  ResultSrcD,                // Selects value to write to register file: 00 = ALU result, 01 = ReadData, 10 = PC+4, 11 = PCTarget (for AUIPC)
     output logic        MemWriteD, JumpD, BranchD, // control signals for memory write, jump, and branch instructions
-    output logic [4:0]  ALUControlD,               // ALU control signals
+    output logic [3:0]  ALUControlD,               // ALU control signals
     output logic        ALUSrcD,                   // 1 chooses ImmExt, O chooses WriteData
     output logic [2:0]  ImmSrcD,                   // Type of immediate extension
     output logic        CSRSrcD                    // 1 selects CSR result for writing to rd, 0 selects ALU result
@@ -36,7 +36,7 @@ module controller(
         BranchD       = 1'b0;
         JumpD         = 1'b0;
         MemEnD        = 1'b0;
-        ALUControlD   = 5'b00000; // ADD
+        ALUControlD   = 4'b0000; // ADD
         CSRSrcD = 1'b0;
 
         case (OpD)
@@ -52,7 +52,7 @@ module controller(
                 JumpD          = 1'b0;
                 MemEnD       = 1'b1;
                 CSRSrcD       = 1'b0;
-                ALUControlD   = 5'b00000; // ADD (address = rs1 + imm)
+                ALUControlD   = 4'b0000; // ADD (address = rs1 + imm)
             end
 
             // SW  (Op = 0100011)
@@ -67,7 +67,7 @@ module controller(
                 JumpD          = 1'b0;
                 MemEnD       = 1'b1;
                 CSRSrcD       = 1'b0;
-                ALUControlD   = 5'b00000; // ADD (address = rs1 + imm)
+                ALUControlD   = 4'b0000; // ADD (address = rs1 + imm)
             end
 
             // R-TYPE  (Op = 0110011)
@@ -86,24 +86,24 @@ module controller(
                 if (Funct7D[0]) begin
                     // Zmmul
                     case (Funct3D)
-                        3'b000: ALUControlD = 5'b01100; // MUL
-                        3'b001: ALUControlD = 5'b01101; // MULH
-                        3'b010: ALUControlD = 5'b01110; // MULHSU
-                        3'b011: ALUControlD = 5'b01111; // MULHU
-                        default: ALUControlD = 5'b00000;
+                        3'b000: ALUControlD = 4'b1100; // MUL
+                        3'b001: ALUControlD = 4'b1101; // MULH
+                        3'b010: ALUControlD = 4'b1110; // MULHSU
+                        3'b011: ALUControlD = 4'b1111; // MULHU
+                        default: ALUControlD = 4'b0000;
                     endcase
                 end else begin
                     case (Funct3D)
-                        3'b000: ALUControlD = Funct7D[5] ? 5'b00001  // SUB
-                                                    : 5'b00000; // ADD
-                        3'b001: ALUControlD = 5'b00010; // SLL
-                        3'b010: ALUControlD = 5'b00011; // SLT
-                        3'b011: ALUControlD = 5'b00100; // SLTU
-                        3'b100: ALUControlD = 5'b00101; // XOR
-                        3'b101: ALUControlD = Funct7D[5] ? 5'b00111 : 5'b00110; // SRA or SRL
-                        3'b110: ALUControlD = 5'b01000; // OR
-                        3'b111: ALUControlD = 5'b01001; // AND
-                        default: ALUControlD = 5'b00000;
+                        3'b000: ALUControlD = Funct7D[5] ? 4'b0001  // SUB
+                                                    : 4'b0000; // ADD
+                        3'b001: ALUControlD = 4'b0010; // SLL
+                        3'b010: ALUControlD = 4'b0011; // SLT
+                        3'b011: ALUControlD = 4'b0100; // SLTU
+                        3'b100: ALUControlD = 4'b0101; // XOR
+                        3'b101: ALUControlD = Funct7D[5] ? 4'b0111 : 4'b0110; // SRA or SRL
+                        3'b110: ALUControlD = 4'b1000; // OR
+                        3'b111: ALUControlD = 4'b1001; // AND
+                        default: ALUControlD = 4'b0000;
                     endcase
                 end
             end
@@ -122,15 +122,15 @@ module controller(
                 CSRSrcD       = 1'b0;
 
                 case (Funct3D)
-                    3'b000: ALUControlD = 5'b00000; // ADDI
-                    3'b001: ALUControlD = 5'b00010; // SLLI
-                    3'b010: ALUControlD = 5'b00011; // SLTI
-                    3'b011: ALUControlD = 5'b00100; // SLTUI
-                    3'b100: ALUControlD = 5'b00101; // XOR
-                    3'b101: ALUControlD = Funct7D[5] ? 5'b00111 : 5'b00110; // SRAI or SRLI
-                    3'b110: ALUControlD = 5'b01000; // ORI
-                    3'b111: ALUControlD = 5'b01001; // ANDI
-                    default: ALUControlD = 5'b00000;
+                    3'b000: ALUControlD = 4'b0000; // ADDI
+                    3'b001: ALUControlD = 4'b0010; // SLLI
+                    3'b010: ALUControlD = 4'b0011; // SLTI
+                    3'b011: ALUControlD = 4'b0100; // SLTUI
+                    3'b100: ALUControlD = 4'b0101; // XOR
+                    3'b101: ALUControlD = Funct7D[5] ? 4'b0111 : 4'b0110; // SRAI or SRLI
+                    3'b110: ALUControlD = 4'b1000; // ORI
+                    3'b111: ALUControlD = 4'b1001; // ANDI
+                    default: ALUControlD = 4'b0000;
                 endcase
             end
 
@@ -146,7 +146,7 @@ module controller(
                 JumpD          = 1'b0;
                 MemEnD       = 1'b0;
                 CSRSrcD       = 1'b0;
-                ALUControlD  = 5'b01010; // PASS-B (rd = SrcB = upper immediate)
+                ALUControlD  = 4'b1010; // PASS-B (rd = SrcB = upper immediate)
             end
 
             // BRANCH  (Op = 1100011)
@@ -161,7 +161,7 @@ module controller(
                 JumpD          = 1'b0;
                 MemEnD       = 1'b0;
                 CSRSrcD       = 1'b0;
-                ALUControlD   = 5'b00000; // ADD (sets zero flag for Eq)
+                ALUControlD   = 4'b0000; // ADD (sets zero flag for Eq)
             end
 
             // JAL  (Op = 1101111)
@@ -176,7 +176,7 @@ module controller(
                 JumpD          = 1'b1;
                 MemEnD       = 1'b0;
                 CSRSrcD       = 1'b0;
-                ALUControlD   = 5'b00000; // ADD (jump target)
+                ALUControlD   = 4'b0000; // ADD (jump target)
             end
 
             // JALR  (Op = 1100111)
@@ -191,7 +191,7 @@ module controller(
                 JumpD          = 1'b1;
                 MemEnD       = 1'b0;
                 CSRSrcD       = 1'b0;
-                ALUControlD = 5'b01011; // ADD + clear LSB for JALR
+                ALUControlD = 4'b1011; // ADD + clear LSB for JALR
             end
 
             // AUIPC  (Op = 0010111)
@@ -206,7 +206,7 @@ module controller(
                 JumpD          = 1'b0;
                 MemEnD       = 1'b0;
                 CSRSrcD       = 1'b0;
-                ALUControlD   = 5'b00000; // ADD (PC + imm)
+                ALUControlD   = 4'b0000; // ADD (PC + imm)
             end
 
             // CSRRS  (Op = 1110011)
@@ -220,7 +220,7 @@ module controller(
                 BranchD       = 1'b0;
                 JumpD          = 1'b0;
                 MemEnD       = 1'b0;
-                ALUControlD   = 5'b00000;
+                ALUControlD   = 4'b0000;
                 CSRSrcD       = 1'b1;    // select CSR result into result mux
             end
 

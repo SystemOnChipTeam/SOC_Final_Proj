@@ -20,6 +20,7 @@ module ieu(
         output  logic [31:0]    PCTargetE,
 
         // Inputs Memory Stage
+        input logic        StallM, FlushM,
         input logic [31:0] ALUResultM,
 
         // Inputs Writeback Stage
@@ -46,7 +47,7 @@ module ieu(
     logic        MemEnD, RegWriteD, MemWriteD;
     logic [1:0]  ResultSrcD;
     logic        JumpD, BranchD, ALUSrcD;
-    logic [4:0]  ALUControlD;
+    logic [3:0]  ALUControlD;
     logic [2:0]  ImmSrcD;
 
     // Detect JALR in decode stage based on opcode
@@ -59,7 +60,7 @@ module ieu(
     // Execute Stage internal signals
     logic [31:0] Rd1E, Rd2E, PCE, ImmExtE;
     logic        JumpE, BranchE, ALUSrcE, JalrE;
-    logic [4:0]  ALUControlE;
+    logic [3:0]  ALUControlE;
     logic [31:0] SrcAE, SrcBE;
     logic [2:0]  FlagsE;
     logic        BranchTaken;
@@ -98,7 +99,7 @@ module ieu(
     flopenrc #(1) MemWriteEReg (clk, reset, FlushE, ~StallE, MemWriteD,  MemWriteE);
     flopenrc #(1) JumpEReg     (clk, reset, FlushE, ~StallE, JumpD,      JumpE);
     flopenrc #(1) BranchEReg   (clk, reset, FlushE, ~StallE, BranchD,    BranchE);
-    flopenrc #(5) ALUControlEReg(clk, reset, FlushE, ~StallE, ALUControlD, ALUControlE);
+    flopenrc #(4) ALUControlEReg(clk, reset, FlushE, ~StallE, ALUControlD, ALUControlE);
     flopenrc #(1) ALUSrcEReg   (clk, reset, FlushE, ~StallE, ALUSrcD,    ALUSrcE);
     flopenrc #(1) JalrEReg     (clk, reset, FlushE, ~StallE, JalrD,      JalrE);
     flopenrc #(1)  CSRSrcEReg     (clk, reset, FlushE, ~StallE, CSRSrcD,      CSRSrcE);
@@ -126,6 +127,9 @@ module ieu(
     mux2 #(32) srcbmux(WriteDataE, ImmExtE, ALUSrcE, SrcBE);
     cmp comparator(.SrcA(SrcAE), .SrcB(SrcBE), .Flags(FlagsE));
     alu alu(SrcAE, SrcBE, ALUControlE, ALUResult_Raw);
+
+    // mul unit
+    mul #(32) mul(.clk, .reset, .StallM, .FlushM, .ForwardedSrcAE(SrcAE), .ForwardedSrcBE(SrcBE), .Funct3E, .ProdM);
 
     // Overwrite the ALU result with CSR data if this is a CSR instruction
     logic [31:0] ALUOutE;

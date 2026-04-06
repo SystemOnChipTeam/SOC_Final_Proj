@@ -11,6 +11,7 @@ module hazard(
         input   logic [4:0]     RdE,        // destination register in Execute stage
         input   logic           PCSrcE, // 1 if branch is taken
         input   logic           ResultSrcE0, // 1 if lw is in execute stage
+        input   logic           IsMulE,     // whether we are doing a multiply instruction
         input   logic [4:0]     RdM,        // destination register in Memory stage
         input   logic           RegWriteM,  // 1 if instruction in Memory stage writes to register file
         input   logic           RegWriteW,  // 1 if instruction in Writeback stage writes to register file
@@ -35,11 +36,19 @@ module hazard(
     assign StallF = lwStall;
     assign StallD = lwStall;
 
+    // Stall if mul and next instruction depends on mul result
+    logic DataHazardStall;
+
+    // Check if the instruction in Decode depends on the 2-cycle instruction in Execute
+    assign DataHazardStall = IsMulE &&
+                             ((Rs1D == RdE) || (Rs2D == RdE)) &&
+                             (RdE != 5'b0);
+
     // flush when a branch is taken or a load introduces a bubble
     assign FlushD = PCSrcE;
-    assign FlushE = lwStall | PCSrcE;
+    assign FlushE = lwStall | PCSrcE | DataHazardStall;
 
-// forward to solve data hazards whenever possible
+    // forward to solve data hazards whenever possible
     always_comb begin
         if      (((Rs1E == RdM) & RegWriteM) & (Rs1E != 5'b0)) ForwardAE = 2'b10;
         else if (((Rs1E == RdW) & RegWriteW) & (Rs1E != 5'b0)) ForwardAE = 2'b01;
