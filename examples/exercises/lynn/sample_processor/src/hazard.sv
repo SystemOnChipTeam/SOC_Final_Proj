@@ -11,13 +11,11 @@ module hazard(
         input   logic [4:0]     RdE,        // destination register in Execute stage
         input   logic           PCSrcE, // 1 if branch is taken
         input   logic           ResultSrcE0, // 1 if lw is in execute stage
-        input   logic           IsMulE,     // whether we are doing a multiply instruction
+        input   logic           MulBusy,    // whether the multiply unit is currently busy processing a multiply instruction
         input   logic [4:0]     RdM,        // destination register in Memory stage
         input   logic           RegWriteM,  // 1 if instruction in Memory stage writes to register file
         input   logic           RegWriteW,  // 1 if instruction in Writeback stage writes to register file
         input   logic [4:0]     RdW,        // destination register in Writeback stage
-
-
         // Outputs
         output  logic           StallF, // stall the Fetch stage
         output  logic           StallD, FlushD, // stall and flush the Decode stage
@@ -33,20 +31,12 @@ module hazard(
     // old: assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE)); // stalled due to lw dependency
     assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE)) & (RdE != 5'b0);
 
-    assign StallF = lwStall;
-    assign StallD = lwStall;
-
-    // Stall if mul and next instruction depends on mul result
-    logic DataHazardStall;
-
-    // Check if the instruction in Decode depends on the 2-cycle instruction in Execute
-    assign DataHazardStall = IsMulE &&
-                             ((Rs1D == RdE) || (Rs2D == RdE)) &&
-                             (RdE != 5'b0);
+    assign StallF = lwStall | MulBusy;
+    assign StallD = lwStall | MulBusy;
 
     // flush when a branch is taken or a load introduces a bubble
     assign FlushD = PCSrcE;
-    assign FlushE = lwStall | PCSrcE | DataHazardStall;
+    assign FlushE = lwStall | PCSrcE;
 
     // forward to solve data hazards whenever possible
     always_comb begin
@@ -62,10 +52,10 @@ module hazard(
     end
 
     // Tie off unused pipeline control signals
-    assign StallE = 1'b0;
-    assign StallM = 1'b0;
+    assign StallE = MulBusy;
+    assign StallM = MulBusy;
     assign FlushM = 1'b0;
-    assign StallW = 1'b0;
+    assign StallW = MulBusy;
     assign FlushW = 1'b0;
 
 endmodule

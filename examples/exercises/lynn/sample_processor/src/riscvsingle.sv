@@ -57,6 +57,7 @@ module riscvsingle (
     logic        ResultSrcE0;
     logic [4:0]  RdM;
     logic        RegWriteM;
+    logic        MulWorking;
 
     ifu ifu(
         .clk, .reset,
@@ -81,7 +82,7 @@ module riscvsingle (
         .ALUResultE, .WriteDataE, .Funct3E, .PCPlus4E,
         .PCTargetE,
         // Memory stage input (forwarding)
-        .StallM, FlushM, .ALUResultM,
+        .StallM, .FlushM, .ALUResultM,
         // Writeback stage inputs
         .RegWriteW, .ResultSrcW,
         .ALUResultW, .ReadDataW, .PCPlus4W, .RdW, .PCTargetW,
@@ -92,7 +93,8 @@ module riscvsingle (
         .ForwardAE, .ForwardBE,
         .Rs1E, .Rs2E, .RdE,
         .PCSrcE,
-        .ResultSrcE0
+        .ResultSrcE0,
+        .MulWorking
     );
 
     lsu lsu(
@@ -124,7 +126,7 @@ module riscvsingle (
         .Rs1E, .Rs2E, .RdE,
         .PCSrcE,
         .ResultSrcE0,
-        .IsMulE()
+        .MulBusy(MulWorking),
         // Memory stage
         .RdM, .RegWriteM,
         // Writeback stage

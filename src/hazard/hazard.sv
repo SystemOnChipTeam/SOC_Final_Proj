@@ -61,7 +61,7 @@ module hazard (
   // A stage must stall if the next stage is stalled
   // If any stages are stalled, the first stage that isn't stalled must flush.
 
-  // Flush causes
+  // Flush causesx
   // Traps (TrapM) flush the entire pipeline.
   //   However, breakpoint and ecall traps must finish the writeback stage (commit their results) because these instructions complete before trapping.
   // Trap returns (RetM) also flush the entire pipeline after the RetM (all stages except W) because all the subsequent instructions must be discarded.
