@@ -66,14 +66,14 @@ module mul #(parameter XLEN) (
 
   flopr #(XLEN) ForwardAReg(clk, reset, ForwardedSrcAE, ForwardedSrcAE2);
   flopr #(XLEN) ForwardBReg(clk, reset, ForwardedSrcBE, ForwardedSrcBE2);
-  flopr #(1)        IsMulReg1(clk, reset, IsMulE, IsMulE1);
+  flopr #(1)    IsMulReg1(clk, reset, IsMulE, IsMulE1);
 
-  assign Aprime = {1'b0, ForwardedSrcAE[XLEN-2:0]};
-  assign Bprime = {1'b0, ForwardedSrcBE[XLEN-2:0]};
+  assign Aprime = {1'b0, ForwardedSrcAE2[XLEN-2:0]};
+  assign Bprime = {1'b0, ForwardedSrcBE2[XLEN-2:0]};
   assign PP1E = Aprime * Bprime;
-  assign PA = {(XLEN-1){ForwardedSrcAE[XLEN-1]}} & ForwardedSrcBE[XLEN-2:0];
-  assign PB = {(XLEN-1){ForwardedSrcBE[XLEN-1]}} & ForwardedSrcAE[XLEN-2:0];
-  assign PP = ForwardedSrcAE[XLEN-1] & ForwardedSrcBE[XLEN-1];
+  assign PA = {(XLEN-1){ForwardedSrcAE2[XLEN-1]}} & ForwardedSrcBE2[XLEN-2:0];
+  assign PB = {(XLEN-1){ForwardedSrcBE2[XLEN-1]}} & ForwardedSrcAE2[XLEN-2:0];
+  assign PP = ForwardedSrcAE2[XLEN-1] & ForwardedSrcBE2[XLEN-1];
 
   // flavor of multiplication
   assign MULH   = (Funct3E == 3'b001);
