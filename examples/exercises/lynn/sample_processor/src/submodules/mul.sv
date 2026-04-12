@@ -32,7 +32,9 @@ module mul #(parameter XLEN) (
   input  logic                StallM, FlushM,
   input  logic [XLEN-1:0]     ForwardedSrcAE, ForwardedSrcBE, // source A and B from after Forwarding mux
   input  logic [2:0]          Funct3E,                        // type of multiply
-  output logic [XLEN*2-1:0]   ProdM                           // double-widthproduct
+  input  logic                IsMulE,                         // whether we are doing a multiply instruction
+  output logic [XLEN-1:0]   ProdE,                           // double-widthproduct
+  output logic                MulWorking                      // whether we are currently processing a multiply instruction in execute stage (for hazard unit)
 );
 
   // Number systems
@@ -49,16 +51,22 @@ module mul #(parameter XLEN) (
   // Signed * Unsigned   = P' + ( PA - PB)*2^(XLEN-1) - PP*2^(2XLEN-2)
   // Unsigned * Unsigned = P' + ( PA + PB)*2^(XLEN-1) + PP*2^(2XLEN-2)
 
+  logic [XLEN-1:0] ForwardedSrcAE2, ForwardedSrcBE2;
   logic [XLEN-1:0]    Aprime, Bprime;                       // lower bits of source A and B
   logic               MULH, MULHSU;                         // type of multiply
   logic [XLEN-2:0]    PA, PB;                               // product of msb and lsbs
   logic               PP;                                   // product of msbs
   logic [XLEN*2-1:0]  PP1E, PP2E, PP3E, PP4E;               // partial products
-  logic [XLEN*2-1:0]  PP1M, PP2M, PP3M, PP4M;               // registered partial proudcts
+  logic [XLEN*2-1:0]  PP1E2, PP2E2, PP3E2, PP4E2;               // registered partial proudcts
+  logic               IsMulE1, IsMulE2;                     // registered version of IsMulE to track which stage of multiplication we are in
 
   //////////////////////////////
-  // Execute Stage: Compute partial products
+  // Stage1: Compute partial products
   //////////////////////////////
+
+  flopr #(XLEN) ForwardAReg(clk, reset, ForwardedSrcAE, ForwardedSrcAE2);
+  flopr #(XLEN) ForwardBReg(clk, reset, ForwardedSrcBE, ForwardedSrcBE2);
+  flopr #(1)        IsMulReg1(clk, reset, IsMulE, IsMulE1);
 
   assign Aprime = {1'b0, ForwardedSrcAE[XLEN-2:0]};
   assign Bprime = {1'b0, ForwardedSrcBE[XLEN-2:0]};
@@ -80,14 +88,23 @@ module mul #(parameter XLEN) (
   else             PP4E = {1'b0, PP, {(XLEN*2-2){1'b0}}};
 
   //////////////////////////////
-  // Memory Stage: Sum partial proudcts
+  // Stage2: Sum partial proudcts
   //////////////////////////////
 
-  flopenrc #(XLEN*2) PP1Reg(clk, reset, FlushM, ~StallM, PP1E, PP1M);
-  flopenrc #(XLEN*2) PP2Reg(clk, reset, FlushM, ~StallM, PP2E, PP2M);
-  flopenrc #(XLEN*2) PP3Reg(clk, reset, FlushM, ~StallM, PP3E, PP3M);
-  flopenrc #(XLEN*2) PP4Reg(clk, reset, FlushM, ~StallM, PP4E, PP4M);
+  flopr #(XLEN*2) PP1Reg(clk, reset, PP1E, PP1E2);
+  flopr #(XLEN*2) PP2Reg(clk, reset, PP2E, PP2E2);
+  flopr #(XLEN*2) PP3Reg(clk, reset, PP3E, PP3E2);
+  flopr #(XLEN*2) PP4Reg(clk, reset, PP4E, PP4E2);
+  flopr #(1)      IsMulReg2(clk, reset, IsMulE1, IsMulE2);
 
   // add up partial products; this multi-input add implies CSAs and a final CPA
-  assign ProdM = PP1M + PP2M + PP3M + PP4M; //ForwardedSrcAE * ForwardedSrcBE;
- endmodule
+  logic [XLEN*2-1:0] ProdFull; // internal full-width product
+  assign ProdFull = PP1E2 + PP2E2 + PP3E2 + PP4E2; //ForwardedSrcAE * ForwardedSrcBE;
+
+  assign ProdE = (Funct3E == 3'b000) ? ProdFull[XLEN-1:0] : ProdFull[XLEN*2-1:XLEN];
+  // mul working logic: used to give the multiply unit an extra cycle to compute the result, and to signal to the hazard unit when the multiply unit is busy
+  // MulWorking is high the cycle the multiply is in Decode
+  // Goes low the next cycle when result is ready
+  assign MulWorking = IsMulE & ~IsMulE2;
+
+endmodule

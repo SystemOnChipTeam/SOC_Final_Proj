@@ -40,7 +40,8 @@ module ieu(
         input   logic [1:0]     ForwardAE, ForwardBE,
         output  logic [4:0]     Rs1E, Rs2E, RdE,
         output  logic           PCSrcE,
-        output  logic           ResultSrcE0
+        output  logic           ResultSrcE0,
+        output  logic           MulWorking // whether we are currently processing a multiply instruction in execute stage
     );
 
     // Decode Stage internal signals
@@ -65,6 +66,8 @@ module ieu(
     logic [2:0]  FlagsE;
     logic        BranchTaken;
     logic [31:0] BranchTargetE;
+    logic [31:0] ProdE;
+    logic        IsMulD, IsMulE; // whether the instruction in decode/execute stage is a multiply instruction
 
     // Writeback
     logic [31:0] ResultW;
@@ -78,7 +81,7 @@ module ieu(
     logic [31:0] CSRReadDataD, CSRReadDataE;
     logic        CSRSrcE;
 
-    controller c(.clk, .reset, .InstrD, .MemEnD, .RegWriteD, .ResultSrcD, .MemWriteD, .JumpD, .BranchD, .ALUControlD, .ALUSrcD, .ImmSrcD, .CSRSrcD);
+    controller c(.clk, .reset, .InstrD, .MemEnD, .RegWriteD, .ResultSrcD, .MemWriteD, .JumpD, .BranchD, .ALUControlD, .ALUSrcD, .ImmSrcD, .CSRSrcD, .IsMulD);
 
     // TODO could move csr to other stage if blocking
     csrfile csr(.clk(clk), .reset(reset), .CSRWrite(CSRSrcD), .CSRAdr(InstrD[31:20]), .RS1(Rd1D), .RetiredInstr(~StallE & ~FlushE), .Op(InstrD[6:0]), .Funct3(InstrD[14:12]), .Funct7(InstrD[31:25]), .PCSrc(BranchTaken), .CSRReadData(CSRReadDataD)
@@ -93,6 +96,7 @@ module ieu(
 
     // TODO make struct for these
     // Pipeline Register E-Stage
+    flopenrc #(1) IsMulEReg    (clk, reset, FlushE, ~StallE, IsMulD,     IsMulE);
     flopenrc #(1) MemEnEReg    (clk, reset, FlushE, ~StallE, MemEnD,     MemEnE);
     flopenrc #(1) RegWriteEReg (clk, reset, FlushE, ~StallE, RegWriteD,  RegWriteE);
     flopenrc #(2) ResultSrcEReg(clk, reset, FlushE, ~StallE, ResultSrcD, ResultSrcE);
@@ -129,22 +133,25 @@ module ieu(
     alu alu(SrcAE, SrcBE, ALUControlE, ALUResult_Raw);
 
     // mul unit
-    mul #(32) mul(.clk, .reset, .StallM, .FlushM, .ForwardedSrcAE(SrcAE), .ForwardedSrcBE(SrcBE), .Funct3E, .ProdM);
+    mul #(32) mul(.clk, .reset, .StallM, .FlushM, .ForwardedSrcAE(SrcAE), .ForwardedSrcBE(SrcBE), .IsMulE(IsMulE), .Funct3E(Funct3E), .ProdE(ProdE), .MulWorking(MulWorking));
 
     // Overwrite the ALU result with CSR data if this is a CSR instruction
-    logic [31:0] ALUOutE;
+    logic [31:0] ALUOutE, ALUOutE1;
     assign ALUOutE = CSRSrcE ? CSRReadDataE : ALUResult_Raw;
+
+    // Overwrite the ALU result with the multiply product if this is a multiply instruction
+    assign ALUOutE1 = IsMulE ? ProdE : ALUOutE;
 
     // Branch/Jump Target Logic
     adder pcadder(PCE, ImmExtE, BranchTargetE);
 
     // Select ALUResult for JALR, otherwise normal Branch/JAL target
-    assign PCTargetE = JalrE ? (ALUOutE & 32'hFFFFFFFE) : BranchTargetE;
+    assign PCTargetE = JalrE ? (ALUOutE1 & 32'hFFFFFFFE) : BranchTargetE;
 
     // Output the final ALUResultE to the rest of the pipeline
     assign ALUResultE = (ResultSrcE == 2'b11) ? PCTargetE : // AUIPC
                         (ResultSrcE == 2'b10) ? PCPlus4E  : // JAL / JALR
-                        ALUOutE;                            // LW / SW / R-Type / I-Type / CSR
+                        ALUOutE1;                            // LW / SW / R-Type / I-Type / CSR
 
     always_comb
         case (Funct3E)

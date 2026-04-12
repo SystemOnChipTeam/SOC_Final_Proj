@@ -14,7 +14,8 @@ module controller(
     output logic [3:0]  ALUControlD,               // ALU control signals
     output logic        ALUSrcD,                   // 1 chooses ImmExt, O chooses WriteData
     output logic [2:0]  ImmSrcD,                   // Type of immediate extension
-    output logic        CSRSrcD                    // 1 selects CSR result for writing to rd, 0 selects ALU result
+    output logic        CSRSrcD,                   // 1 selects CSR result for writing to rd, 0 selects ALU result
+    output logic        IsMulD                     // whether the instruction in decode stage is a multiply instruction
 );
 
     logic [6:0] OpD;                             // Opcode in Decode stage
@@ -38,6 +39,7 @@ module controller(
         MemEnD        = 1'b0;
         ALUControlD   = 4'b0000; // ADD
         CSRSrcD = 1'b0;
+        IsMulD = 1'b0;
 
         case (OpD)
             // LW  (Op = 0000011)
@@ -82,7 +84,7 @@ module controller(
                 JumpD          = 1'b0;
                 MemEnD       = 1'b0;
                 CSRSrcD       = 1'b0;
-
+                IsMulD = 1'b0;
                 if (Funct7D[0]) begin
                     // Zmmul
                     case (Funct3D)
@@ -92,6 +94,7 @@ module controller(
                         3'b011: ALUControlD = 4'b1111; // MULHU
                         default: ALUControlD = 4'b0000;
                     endcase
+                    IsMulD = (Funct3D <= 3'b011);
                 end else begin
                     case (Funct3D)
                         3'b000: ALUControlD = Funct7D[5] ? 4'b0001  // SUB
@@ -154,7 +157,7 @@ module controller(
             7'b1100011: begin
                 RegWriteD     = 1'b0;
                 ImmSrcD      = 3'b010;    // B-immediate
-                ALUSrcD       = 1'b0;    // both operands from register file
+                ALUSrcD       = 1'b0;    // both operands from regfter file
                 ResultSrcD   = 2'b00;
                 MemWriteD    = 1'b0;
                 BranchD       = 1'b1;
