@@ -27,8 +27,8 @@ module alu(
     assign LT       = Neg ^ Overflow;
 
     // Shift amount — bottom 5 bits of SrcB (rs2 or shamt immediate)
-    logic [3:0] Shamt;
-    assign Shamt = SrcB[3:0];
+    logic [4:0] Shamt;
+    assign Shamt = SrcB[4:0];
 
     // Result mux
     always_comb begin

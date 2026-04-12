@@ -9,7 +9,7 @@ module flopr #(parameter WIDTH, parameter DEFAULT = 0) (
         output  logic [WIDTH-1:0]   Q
     );
 
-    always_ff @(posedge clk, posedge reset) begin
+    always_ff @(posedge clk) begin
         if (reset)  Q <= DEFAULT;
         else        Q <= D;
     end
