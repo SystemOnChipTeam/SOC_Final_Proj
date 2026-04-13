@@ -70,7 +70,22 @@ module mul #(parameter XLEN) (
 
   assign Aprime = {1'b0, ForwardedSrcAE2[XLEN-2:0]};
   assign Bprime = {1'b0, ForwardedSrcBE2[XLEN-2:0]};
-  assign PP1E = Aprime * Bprime;
+
+  localparam HALF = XLEN/2;
+  logic [HALF-1:0]   Aprime_lo, Aprime_hi;
+  logic [XLEN*2-1:0] PP1E_lo, PP1E_hi;
+
+  assign Aprime_lo = Aprime[HALF-1:0];
+  assign Aprime_hi = Aprime[XLEN-1:HALF];
+
+  // Two smaller multiplies instead of one big one
+  assign PP1E_lo = {{XLEN{1'b0}}, Aprime_lo} * {{XLEN{1'b0}}, Bprime};
+  assign PP1E_hi = {{XLEN{1'b0}}, Aprime_hi} * {{XLEN{1'b0}}, Bprime};
+
+  // Combine: PP1E = PP1E_lo + (PP1E_hi << HALF)
+  assign PP1E = PP1E_lo + (PP1E_hi << HALF);
+
+  // TODO move registers here
   assign PA = {(XLEN-1){ForwardedSrcAE2[XLEN-1]}} & ForwardedSrcBE2[XLEN-2:0];
   assign PB = {(XLEN-1){ForwardedSrcBE2[XLEN-1]}} & ForwardedSrcAE2[XLEN-2:0];
   assign PP = ForwardedSrcAE2[XLEN-1] & ForwardedSrcBE2[XLEN-1];
