@@ -68,22 +68,30 @@ module mul #(parameter XLEN) (
   flopr #(XLEN) ForwardBReg(clk, reset, ForwardedSrcBE, ForwardedSrcBE2);
   flopr #(1)    IsMulReg1(clk, reset, IsMulE, IsMulE1);
 
-  assign Aprime = {1'b0, ForwardedSrcAE2[XLEN-2:0]};
-  assign Bprime = {1'b0, ForwardedSrcBE2[XLEN-2:0]};
+    assign Aprime = {1'b0, ForwardedSrcAE2[XLEN-2:0]};
+    assign Bprime = {1'b0, ForwardedSrcBE2[XLEN-2:0]};
 
-  localparam HALF = XLEN/2;
-  logic [HALF-1:0]   Aprime_lo, Aprime_hi;
-  logic [XLEN*2-1:0] PP1E_lo, PP1E_hi;
+    localparam HALF = XLEN/2;
+    logic [HALF-1:0]   Aprime_lo, Aprime_hi;
+    logic [HALF-1:0]   Bprime_lo, Bprime_hi;
+    logic [XLEN-1:0]   PP1E_ll, PP1E_lh, PP1E_hl, PP1E_hh;
 
-  assign Aprime_lo = Aprime[HALF-1:0];
-  assign Aprime_hi = Aprime[XLEN-1:HALF];
+    assign Aprime_lo = Aprime[HALF-1:0];
+    assign Aprime_hi = Aprime[XLEN-1:HALF];
+    assign Bprime_lo = Bprime[HALF-1:0];
+    assign Bprime_hi = Bprime[XLEN-1:HALF];
 
-  // Two smaller multiplies instead of one big one
-  assign PP1E_lo = {{XLEN{1'b0}}, Aprime_lo} * {{XLEN{1'b0}}, Bprime};
-  assign PP1E_hi = {{XLEN{1'b0}}, Aprime_hi} * {{XLEN{1'b0}}, Bprime};
+    // Four 16x16 multiplies — true HALF x HALF critical path
+    assign PP1E_ll = Aprime_lo * Bprime_lo;
+    assign PP1E_lh = Aprime_lo * Bprime_hi;
+    assign PP1E_hl = Aprime_hi * Bprime_lo;
+    assign PP1E_hh = Aprime_hi * Bprime_hi;
 
-  // Combine: PP1E = PP1E_lo + (PP1E_hi << HALF)
-  assign PP1E = PP1E_lo + (PP1E_hi << HALF);
+    // Combine
+    assign PP1E = {{XLEN{1'b0}},  PP1E_ll}
+                + {{HALF{1'b0}},  PP1E_lh, {HALF{1'b0}}}
+                + {{HALF{1'b0}},  PP1E_hl, {HALF{1'b0}}}
+                + {               PP1E_hh, {XLEN{1'b0}}};
 
   // TODO move registers here
   assign PA = {(XLEN-1){ForwardedSrcAE2[XLEN-1]}} & ForwardedSrcBE2[XLEN-2:0];
