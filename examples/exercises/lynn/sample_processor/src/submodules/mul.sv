@@ -2,7 +2,7 @@
 // mul.sv
 //
 // Written: David_Harris@hmc.edu 16 February 2021
-// Modified:
+// Modified: Pierce Clark and Max Conine 12 April 2026
 //
 // Purpose: Integer multiplication
 //
