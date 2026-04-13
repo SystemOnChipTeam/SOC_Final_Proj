@@ -124,35 +124,34 @@ module ieu(
     // Datapath Forwarding
     mux3 #(32) ForwardmuxA(Rd1E, ResultW, ALUResultM, ForwardAE, SrcAE);
     mux3 #(32) ForwardmuxB(Rd2E, ResultW, ALUResultM, ForwardBE, WriteDataE);
-
-    // Comparator and ALU
-    logic [31:0] ALUResult_Raw;
-
     mux2 #(32) srcbmux(WriteDataE, ImmExtE, ALUSrcE, SrcBE);
+
+    // Execute stage modules
+    logic [31:0] ALUResult_Raw;
     cmp comparator(.SrcA(SrcAE), .SrcB(SrcBE), .Flags(FlagsE));
     alu alu(SrcAE, SrcBE, ALUControlE, ALUResult_Raw);
+    mul #(32) mul(.clk, .reset, .ForwardedSrcAE(SrcAE), .ForwardedSrcBE(SrcBE), .IsMulE(IsMulE), .Funct3E(Funct3E), .ProdE(ProdE), .MulWorking(MulWorking));
 
-    // mul unit
-    mul #(32) mul(.clk, .reset, .StallM, .FlushM, .ForwardedSrcAE(SrcAE), .ForwardedSrcBE(SrcBE), .IsMulE(IsMulE), .Funct3E(Funct3E), .ProdE(ProdE), .MulWorking(MulWorking));
-
-    // Overwrite the ALU result with CSR data if this is a CSR instruction
-    logic [31:0] ALUOutE, ALUOutE1;
-    assign ALUOutE = CSRSrcE ? CSRReadDataE : ALUResult_Raw;
-
-    // Overwrite the ALU result with the multiply product if this is a multiply instruction
-    assign ALUOutE1 = IsMulE ? ProdE : ALUOutE;
+    // Select ALU result:
+    logic [31:0] ALUOutE;
+    always_comb
+        if      (IsMulE)   ALUOutE = ProdE;          // MUL/MULH/MULHSU/MULHU
+        else if (CSRSrcE)  ALUOutE = CSRReadDataE;   // CSR
+        else               ALUOutE = ALUResult_Raw;  // normal ALU
 
     // Branch/Jump Target Logic
     adder pcadder(PCE, ImmExtE, BranchTargetE);
-
-    // Select ALUResult for JALR, otherwise normal Branch/JAL target
-    assign PCTargetE = JalrE ? (ALUOutE1 & 32'hFFFFFFFE) : BranchTargetE;
+    assign PCTargetE = JalrE ? (ALUOutE & 32'hFFFFFFFE) : BranchTargetE;
 
     // Output the final ALUResultE to the rest of the pipeline
-    assign ALUResultE = (ResultSrcE == 2'b11) ? PCTargetE : // AUIPC
-                        (ResultSrcE == 2'b10) ? PCPlus4E  : // JAL / JALR
-                        ALUOutE1;                            // LW / SW / R-Type / I-Type / CSR
+    always_comb
+        case (ResultSrcE)
+            2'b11:   ALUResultE = PCTargetE;  // AUIPC
+            2'b10:   ALUResultE = PCPlus4E;   // JAL / JALR
+            default: ALUResultE = ALUOutE;    // LW / SW / R-Type / I-Type / CSR / MUL
+        endcase
 
+    // PCSrcE logic
     always_comb
         case (Funct3E)
             3'b000: BranchTaken = FlagsE[0];   // BEQ

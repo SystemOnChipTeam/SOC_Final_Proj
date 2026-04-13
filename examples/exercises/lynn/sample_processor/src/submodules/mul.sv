@@ -29,11 +29,10 @@
 
 module mul #(parameter XLEN) (
   input  logic                clk, reset,
-  input  logic                StallM, FlushM,
   input  logic [XLEN-1:0]     ForwardedSrcAE, ForwardedSrcBE, // source A and B from after Forwarding mux
   input  logic [2:0]          Funct3E,                        // type of multiply
   input  logic                IsMulE,                         // whether we are doing a multiply instruction
-  output logic [XLEN-1:0]   ProdE,                           // double-widthproduct
+  output logic [XLEN-1:0]     ProdE,                           // double-widthproduct
   output logic                MulWorking                      // whether we are currently processing a multiply instruction in execute stage (for hazard unit)
 );
 
@@ -51,7 +50,7 @@ module mul #(parameter XLEN) (
   // Signed * Unsigned   = P' + ( PA - PB)*2^(XLEN-1) - PP*2^(2XLEN-2)
   // Unsigned * Unsigned = P' + ( PA + PB)*2^(XLEN-1) + PP*2^(2XLEN-2)
 
-  logic [XLEN-1:0] ForwardedSrcAE2, ForwardedSrcBE2;
+  logic [XLEN-1:0] ForwardedSrcAE1, ForwardedSrcBE1;
   logic [XLEN-1:0]    Aprime, Bprime;                       // lower bits of source A and B
   logic               MULH, MULHSU;                         // type of multiply
   logic [XLEN-2:0]    PA, PB;                               // product of msb and lsbs
@@ -64,12 +63,12 @@ module mul #(parameter XLEN) (
   // Stage1: Compute partial products
   //////////////////////////////
 
-  flopr #(XLEN) ForwardAReg(clk, reset, ForwardedSrcAE, ForwardedSrcAE2);
-  flopr #(XLEN) ForwardBReg(clk, reset, ForwardedSrcBE, ForwardedSrcBE2);
+  flopr #(XLEN) ForwardAReg(clk, reset, ForwardedSrcAE, ForwardedSrcAE1);
+  flopr #(XLEN) ForwardBReg(clk, reset, ForwardedSrcBE, ForwardedSrcBE1);
   flopr #(1)    IsMulReg1(clk, reset, IsMulE, IsMulE1);
 
-    assign Aprime = {1'b0, ForwardedSrcAE2[XLEN-2:0]};
-    assign Bprime = {1'b0, ForwardedSrcBE2[XLEN-2:0]};
+    assign Aprime = {1'b0, ForwardedSrcAE1[XLEN-2:0]};
+    assign Bprime = {1'b0, ForwardedSrcBE1[XLEN-2:0]};
 
     localparam HALF = XLEN/2;
     logic [HALF-1:0]   Aprime_lo, Aprime_hi;
@@ -87,10 +86,9 @@ module mul #(parameter XLEN) (
     assign PP1E_hl = Aprime_hi * Bprime_lo;
     assign PP1E_hh = Aprime_hi * Bprime_hi;
 
-  // TODO move registers here
-  assign PA = {(XLEN-1){ForwardedSrcAE2[XLEN-1]}} & ForwardedSrcBE2[XLEN-2:0];
-  assign PB = {(XLEN-1){ForwardedSrcBE2[XLEN-1]}} & ForwardedSrcAE2[XLEN-2:0];
-  assign PP = ForwardedSrcAE2[XLEN-1] & ForwardedSrcBE2[XLEN-1];
+  assign PA = {(XLEN-1){ForwardedSrcAE1[XLEN-1]}} & ForwardedSrcBE1[XLEN-2:0];
+  assign PB = {(XLEN-1){ForwardedSrcBE1[XLEN-1]}} & ForwardedSrcAE1[XLEN-2:0];
+  assign PP = ForwardedSrcAE1[XLEN-1] & ForwardedSrcBE1[XLEN-1];
 
   // flavor of multiplication
   assign MULH   = (Funct3E == 3'b001);
