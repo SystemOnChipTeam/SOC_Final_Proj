@@ -16,7 +16,6 @@ module ieu(
         output  logic [31:0]    ALUResultE,
         output  logic [31:0]    WriteDataE,
         output  logic [2:0]     Funct3E,
-        output  logic [31:0]    PCPlus4E,
         output  logic [31:0]    PCTargetE,
 
         // Inputs Memory Stage
@@ -28,9 +27,7 @@ module ieu(
         input   logic [1:0]     ResultSrcW,
         input   logic [31:0]    ALUResultW,
         input   logic [31:0]    ReadDataW,
-        input   logic [31:0]    PCPlus4W,
         input   logic [4:0]     RdW,
-        input   logic [31:0]    PCTargetW,
 
         // Hazard Unit Decode Stage Interface
         output  logic [4:0]     Rs1D, Rs2D,
@@ -50,6 +47,7 @@ module ieu(
     logic        JumpD, BranchD, ALUSrcD;
     logic [3:0]  ALUControlD;
     logic [2:0]  ImmSrcD;
+    logic [31:0] PCPlus4E;
 
     // Detect JALR in decode stage based on opcode
     logic        JalrD;
@@ -166,6 +164,7 @@ module ieu(
     assign PCSrcE = (BranchE & BranchTaken) | JumpE | JalrE;
 
     // Writeback mux
-    mux4 #(32) resultmux(ALUResultW, ReadDataW, PCPlus4W, PCTargetW, ResultSrcW, ResultW);
+
+    assign ResultW = (ResultSrcW == 2'b01) ? ReadDataW : ALUResultW;
 
 endmodule

@@ -12,9 +12,7 @@ module lsu(
         input   logic   [31:0]  ALUResultE, // ALU result
         input   logic   [31:0]  WriteDataE, // Data to write to memory
         input   logic   [4:0]   RdE,        // Destination register
-        input   logic   [31:0]  PCPlus4E,   // PC+4 value
         input   logic   [2:0]   Funct3E,    // Function 3 field
-        input   logic   [31:0]  PCTargetE,  // Branch target address
 
         // Hazard Unit interface
         input   logic StallM, FlushM, StallW, FlushW, // stall and flush signals for M and W stages
@@ -24,9 +22,8 @@ module lsu(
         // Outputs
         output  logic         RegWriteW,                         // register file write enable in Writeback stage
         output  logic   [1:0]   ResultSrcW,                      // Result source selector in Writeback stage
-        output  logic   [31:0]  ALUResultW, ReadDataW, PCPlus4W, // ALU result, memory read data, and PC+4 value in Writeback stage
+        output  logic   [31:0]  ALUResultW, ReadDataW, // ALU result, memory read data, and PC+4 value in Writeback stage
         output  logic   [4:0]   RdW,                             // Destination register in Writeback stage
-        output logic    [31:0]  PCTargetW,                       // Branch target address in Writeback stage
 
         // DTIM Interface
         output  logic   [31:0]  ALUResultM,  // Data memory target address
@@ -39,9 +36,8 @@ module lsu(
 
     // Declare internal signals
     logic   [1:0]   ResultSrcM;                      // Result source selector in Memory stage
-    logic   [31:0]  WriteDataM, ReadDataM, PCPlus4M; // Data to write to memory, data read from memory, and PC+4 value in Memory stage
+    logic   [31:0]  WriteDataM, ReadDataM; // Data to write to memory, data read from memory, and PC+4 value in Memory stage
     logic   [2:0]   Funct3M;                         // Function 3 field in Memory stage
-    logic   [31:0]  PCTargetM;                       // Branch target address in Memory stage
 
     // Pipeline Register M-Stage
     flopenrc #(1)  MemEnMReg    (clk, reset, FlushM, ~StallM, MemEnE,    MemEnM);
@@ -52,9 +48,6 @@ module lsu(
     flopenrc #(32) WriteDataMReg(clk, reset, FlushM, ~StallM, WriteDataE,WriteDataM);
     flopenrc #(3)  Funct3MReg   (clk, reset, FlushM, ~StallM, Funct3E,   Funct3M);
     flopenrc #(5)  RdMReg       (clk, reset, FlushM, ~StallM, RdE,       RdM);
-    flopenrc #(32) PCPlus4MReg  (clk, reset, FlushM, ~StallM, PCPlus4E,  PCPlus4M);
-    flopenrc #(32) PCTargetMReg(clk, reset, FlushM, ~StallM, PCTargetE, PCTargetM);
-
 
     //DTIM Read and Write Logic
     logic [15:0]    HalfwordM;
@@ -99,7 +92,5 @@ module lsu(
     flopenrc #(32) ALUResultWReg(clk, reset, FlushW, ~StallW, ALUResultM,ALUResultW);
     flopenrc #(32) ReadDataWReg (clk, reset, FlushW, ~StallW, ReadDataM, ReadDataW);
     flopenrc #(5)  RdWReg       (clk, reset, FlushW, ~StallW, RdM, RdW);
-    flopenrc #(32) PCPlus4WReg  (clk, reset, FlushW, ~StallW, PCPlus4M,  PCPlus4W);
-    flopenrc #(32) PCTargetWReg(clk, reset, FlushW, ~StallW, PCTargetM, PCTargetW);
 
 endmodule
