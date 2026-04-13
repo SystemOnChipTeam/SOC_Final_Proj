@@ -56,7 +56,7 @@ module mul #(parameter XLEN) (
   logic               MULH, MULHSU;                         // type of multiply
   logic [XLEN-2:0]    PA, PB;                               // product of msb and lsbs
   logic               PP;                                   // product of msbs
-  logic [XLEN*2-1:0]  PP1E, PP2E, PP3E, PP4E;               // partial products
+  logic [XLEN*2-1:0]  PP2E, PP3E, PP4E;               // partial products
   logic [XLEN*2-1:0]  PP1E2, PP2E2, PP3E2, PP4E2;               // registered partial proudcts
   logic               IsMulE1, IsMulE2;                     // registered version of IsMulE to track which stage of multiplication we are in
 
@@ -87,12 +87,6 @@ module mul #(parameter XLEN) (
     assign PP1E_hl = Aprime_hi * Bprime_lo;
     assign PP1E_hh = Aprime_hi * Bprime_hi;
 
-    // Combine
-    assign PP1E = {{XLEN{1'b0}},  PP1E_ll}
-                + {{HALF{1'b0}},  PP1E_lh, {HALF{1'b0}}}
-                + {{HALF{1'b0}},  PP1E_hl, {HALF{1'b0}}}
-                + {               PP1E_hh, {XLEN{1'b0}}};
-
   // TODO move registers here
   assign PA = {(XLEN-1){ForwardedSrcAE2[XLEN-1]}} & ForwardedSrcBE2[XLEN-2:0];
   assign PB = {(XLEN-1){ForwardedSrcBE2[XLEN-1]}} & ForwardedSrcAE2[XLEN-2:0];
@@ -113,12 +107,21 @@ module mul #(parameter XLEN) (
   //////////////////////////////
   // Stage2: Sum partial proudcts
   //////////////////////////////
-
-  flopr #(XLEN*2) PP1Reg(clk, reset, PP1E, PP1E2);
+  logic [XLEN-1:0] PP1E_ll2, PP1E_lh2, PP1E_hl2, PP1E_hh2;
+  flopr #(XLEN) PP1E_llReg(clk, reset, PP1E_ll, PP1E_ll2);
+  flopr #(XLEN) PP1E_lhReg(clk, reset, PP1E_lh, PP1E_lh2);
+  flopr #(XLEN) PP1E_hlReg(clk, reset, PP1E_hl, PP1E_hl2);
+  flopr #(XLEN) PP1E_hhReg(clk, reset, PP1E_hh, PP1E_hh2);
   flopr #(XLEN*2) PP2Reg(clk, reset, PP2E, PP2E2);
   flopr #(XLEN*2) PP3Reg(clk, reset, PP3E, PP3E2);
   flopr #(XLEN*2) PP4Reg(clk, reset, PP4E, PP4E2);
   flopr #(1)      IsMulReg2(clk, reset, IsMulE1, IsMulE2);
+
+      // Combine
+    assign PP1E2 = {{XLEN{1'b0}},  PP1E_ll2}
+                + {{HALF{1'b0}},  PP1E_lh2, {HALF{1'b0}}}
+                + {{HALF{1'b0}},  PP1E_hl2, {HALF{1'b0}}}
+                + {               PP1E_hh2, {XLEN{1'b0}}};
 
   // add up partial products; this multi-input add implies CSAs and a final CPA
   logic [XLEN*2-1:0] ProdFull; // internal full-width product
