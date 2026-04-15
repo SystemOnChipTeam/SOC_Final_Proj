@@ -57,7 +57,7 @@ module mul #(parameter XLEN) (
   logic               PP;                                   // product of msbs
   logic [XLEN*2-1:0]  PP2E, PP3E, PP4E;               // partial products
   logic [XLEN*2-1:0]  PP1E2, PP2E2, PP3E2, PP4E2;               // registered partial proudcts
-  logic               IsMulE1, IsMulE2;                     // registered version of IsMulE to track which stage of multiplication we are in
+  logic               IsMulE1;                     // registered version of IsMulE to track which stage of multiplication we are in
 
   //////////////////////////////
   // Stage1: Compute partial products
@@ -113,7 +113,6 @@ module mul #(parameter XLEN) (
   flopr #(XLEN*2) PP2Reg(clk, reset, PP2E, PP2E2);
   flopr #(XLEN*2) PP3Reg(clk, reset, PP3E, PP3E2);
   flopr #(XLEN*2) PP4Reg(clk, reset, PP4E, PP4E2);
-  flopr #(1)      IsMulReg2(clk, reset, IsMulE1, IsMulE2);
 
       // Combine
     assign PP1E2 = {{XLEN{1'b0}},  PP1E_ll2}
@@ -129,6 +128,17 @@ module mul #(parameter XLEN) (
   // mul working logic: used to give the multiply unit an extra cycle to compute the result, and to signal to the hazard unit when the multiply unit is busy
   // MulWorking is high the cycle the multiply is in Decode
   // Goes low the next cycle when result is ready
-  assign MulWorking = IsMulE & ~IsMulE2;
+
+  logic [1:0] count;
+  always_ff @(posedge clk) begin
+      if (IsMulE & ~IsMulE1)  // first cycle of a new multiply
+          count <= 2'b00;
+      else if (count == 2'b10) // finished, reset for next
+          count <= 2'b00;
+      else if (IsMulE)         // count while multiply active
+          count <= count + 1;
+  end
+
+  assign MulWorking = IsMulE & (count < 2'b10);
 
 endmodule
