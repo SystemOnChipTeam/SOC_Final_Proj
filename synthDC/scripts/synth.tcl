@@ -141,7 +141,7 @@ if {  $find_clock != [list] } {
 
 
 # Optimize paths that are close to critical
-set_critical_range 0.1 $current_design
+set_critical_range 0.10 $current_design
 
 # Partitioning - flatten or hierarchically synthesize
 if { $maxopt == 1 } {

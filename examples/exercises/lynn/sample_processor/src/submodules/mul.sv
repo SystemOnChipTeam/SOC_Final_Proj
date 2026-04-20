@@ -128,6 +128,7 @@ module mul #(parameter XLEN) (
   assign ProdE = (Funct3E == 3'b000) ? ProdFull[XLEN-1:0] : ProdFull[XLEN*2-1:XLEN];
   // mul working logic: used to give the multiply unit an extra cycle to compute the result
 
+  // mul working logic: used to give the multiply unit 2 extra cycles to compute the result
   logic [1:0] count;
   always_ff @(posedge clk) begin
     if (IsMulE & ~IsMulE1)  // first cycle of a new multiply
