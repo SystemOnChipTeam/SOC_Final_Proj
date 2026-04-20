@@ -117,7 +117,6 @@ module riscvsingle (
 
     hazard hzu(
         // Inputs
-        .clk, .reset,
         // Decode stage
         .Rs1D, .Rs2D,
         // Execute stage

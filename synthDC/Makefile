@@ -81,6 +81,7 @@ mkdirecs:
 	@mkdir -p $(OUTPUTDIR)/mapped
 	@mkdir -p $(OUTPUTDIR)/unmapped
 
+# .PHONY: synth mkdirecs configs rundc $(CONFIG)
 synth: mkdirecs configs rundc # clean
 
 rundc:
