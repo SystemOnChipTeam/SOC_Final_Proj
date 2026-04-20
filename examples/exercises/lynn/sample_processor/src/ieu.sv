@@ -19,7 +19,6 @@ module ieu(
         output  logic [31:0]    PCTargetE,
 
         // Inputs Memory Stage
-        input logic        StallM, FlushM,
         input logic [31:0] ALUResultM,
 
         // Inputs Writeback Stage

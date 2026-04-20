@@ -80,7 +80,7 @@ module riscvsingle (
         .MemEnE, .RegWriteE, .ResultSrcE, .MemWriteE,
         .ALUResultE, .WriteDataE, .Funct3E, .PCTargetE,
         // Memory stage input (forwarding)
-        .StallM, .FlushM, .ALUResultM,
+        .ALUResultM,
         // Writeback stage inputs
         .RegWriteW, .ResultSrcW,
         .ALUResultW, .ReadDataW, .RdW,
