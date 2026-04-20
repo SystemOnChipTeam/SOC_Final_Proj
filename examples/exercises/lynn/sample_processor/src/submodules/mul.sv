@@ -125,10 +125,8 @@ module mul #(parameter XLEN) (
   assign ProdFull = PP1E2 + PP2E2 + PP3E2 + PP4E2; //ForwardedSrcAE * ForwardedSrcBE;
 
   assign ProdE = (Funct3E == 3'b000) ? ProdFull[XLEN-1:0] : ProdFull[XLEN*2-1:XLEN];
-  // mul working logic: used to give the multiply unit an extra cycle to compute the result, and to signal to the hazard unit when the multiply unit is busy
-  // MulWorking is high the cycle the multiply is in Decode
-  // Goes low the next cycle when result is ready
 
+  // mul working logic: used to give the multiply unit 2 extra cycles to compute the result
   logic [1:0] count;
   always_ff @(posedge clk) begin
       if (IsMulE & ~IsMulE1)  // first cycle of a new multiply
