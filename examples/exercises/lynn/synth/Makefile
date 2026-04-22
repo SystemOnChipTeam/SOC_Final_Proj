@@ -29,8 +29,8 @@ SYNTH_MAKE_FLAGS 	?= \
 	HDLDIR=$(PROCESSOR_DIR) \
 	LYNN=1 \
 	TECH=$(SYNTH_TECH) \
-	MAXOPT=1 \
 	FREQ=500
+ 	MAXOPT=1 \
 
 all: synth
 

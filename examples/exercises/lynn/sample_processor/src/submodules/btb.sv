@@ -1,9 +1,12 @@
 // btb.sv
 // RISC-V pipelined processor
+// Optimized for Area: Partial Tags, PC-Relative Offsets, and Implicit Alignment
 // pclark@hmc.edu mconine@hmc.edu 2026
 
 module btb #(
-    parameter INDEX_BITS = 4
+    parameter INDEX_BITS = 3,
+    parameter TAG_BITS = 10,       // Optimization 1: Partial Tag (compressed)
+    parameter OFFSET_BITS = 14     // Optimization 2 & 3: Stored offset bits (represents a 16-bit reach)
 )(
     input  logic        clk,
     input  logic        reset,
@@ -11,23 +14,21 @@ module btb #(
     // --- Fetch Stage (Read) ---
     input  logic [31:0] PCF,
     output logic [31:0] PredictedTargetF,
-    output logic        BTBHitF, // 1 if we have a cached target for this PC
+    output logic        BTBHitF,
 
     // --- Execute Stage (Write/Update) ---
     input  logic [31:0] PCE,
-    input  logic [31:0] PCTargetE, // The actual branch/jump target calculated in E
-    input  logic        UpdateBTBE // 1 to write/update the BTB (usually BranchE | JumpE)
+    input  logic [31:0] PCTargetE,
+    input  logic        UpdateBTBE
 );
 
-    // Calculate tag size based on 32-bit PC, minus index bits, minus 2 byte-offset bits
-    localparam TAG_BITS = 32 - 2 - INDEX_BITS;
     localparam NUM_ENTRIES = 1 << INDEX_BITS;
 
     // Define the BTB entry structure
     typedef struct packed {
-        logic                valid;
-        logic [TAG_BITS-1:0] tag;
-        logic [31:0]         target;
+        logic                   valid;
+        logic [TAG_BITS-1:0]    tag;
+        logic [OFFSET_BITS-1:0] offset; // Stores bits [OFFSET_BITS+1 : 2] of the branch distance
     } btb_entry_t;
 
     // The BTB memory array
@@ -38,36 +39,50 @@ module btb #(
     // -----------------------------------------
     logic [INDEX_BITS-1:0] index_F;
     logic [TAG_BITS-1:0]   tag_F;
+    logic [31:0]           sign_ext_offset_F;
 
+    // Extract the index and the compressed tag from the PC
     assign index_F = PCF[INDEX_BITS+1 : 2];
-    assign tag_F   = PCF[31 : INDEX_BITS+2];
+    assign tag_F   = PCF[INDEX_BITS+2 + TAG_BITS - 1 : INDEX_BITS+2];
 
-    // We have a hit if the entry is valid AND the tags match
+    // We have a hit if the entry is valid AND the partial tags match
     assign BTBHitF = btb_ram[index_F].valid & (btb_ram[index_F].tag == tag_F);
-    assign PredictedTargetF = btb_ram[index_F].target;
+
+    // Reconstruct the target: Sign-extend the stored offset, pad the bottom 2 bits with 0s, and add to PCF
+    assign sign_ext_offset_F = { {(32 - OFFSET_BITS - 2){btb_ram[index_F].offset[OFFSET_BITS-1]}},
+                                 btb_ram[index_F].offset,
+                                 2'b00 };
+
+    assign PredictedTargetF = PCF + sign_ext_offset_F;
 
     // -----------------------------------------
     // Write Logic (Sequential for Execute)
     // -----------------------------------------
     logic [INDEX_BITS-1:0] index_E;
     logic [TAG_BITS-1:0]   tag_E;
+    logic [31:0]           full_offset_E;
 
+    // Extract the index and the compressed tag from the executing PC
     assign index_E = PCE[INDEX_BITS+1 : 2];
-    assign tag_E   = PCE[31 : INDEX_BITS+2];
+    assign tag_E   = PCE[INDEX_BITS+2 + TAG_BITS - 1 : INDEX_BITS+2];
+
+    // Calculate the absolute distance between the jump target and the current instruction
+    assign full_offset_E = PCTargetE - PCE;
 
     always_ff @(posedge clk) begin
         if (reset) begin
             // Invalidate all entries on reset
             for (int i = 0; i < NUM_ENTRIES; i++) begin
-                btb_ram[i].valid <= 1'b0;
-                btb_ram[i].tag   <= '0;
-                btb_ram[i].target<= '0;
+                btb_ram[i].valid  <= 1'b0;
+                btb_ram[i].tag    <= '0;
+                btb_ram[i].offset <= '0;
             end
         end else if (UpdateBTBE) begin
-            // Write the new target and tag into the BTB
+            // Write the new offset and partial tag into the BTB
             btb_ram[index_E].valid  <= 1'b1;
             btb_ram[index_E].tag    <= tag_E;
-            btb_ram[index_E].target <= PCTargetE;
+            // Chop off the bottom 2 bits (always 00) and store the next OFFSET_BITS
+            btb_ram[index_E].offset <= full_offset_E[OFFSET_BITS+1 : 2];
         end
     end
 
