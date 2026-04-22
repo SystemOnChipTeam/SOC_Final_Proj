@@ -3,7 +3,7 @@
 // pclark@hmc.edu mconine@hmc.edu 2026
 
 module btb #(
-    parameter INDEX_BITS = 10
+    parameter INDEX_BITS = 4
 )(
     input  logic        clk,
     input  logic        reset,

@@ -2,7 +2,7 @@
 // RISC-V pipelined processor
 // pclark@hmc.edu mconine@hmc.edu 2026
 
-module two_bit_predictor #(parameter INDEX_BITS = 10)(
+module two_bit_predictor #(parameter INDEX_BITS = 4)(
     input  logic        clk,
     input  logic        reset,
 
