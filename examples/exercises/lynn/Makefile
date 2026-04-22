@@ -196,6 +196,7 @@ VSIM_PLUSARGS_BASE  ?= \
 .PHONY: synth
 synth: lint
 	$(MAKE) -C $(SYNTH_DIR) \
+		WALLY=$(WALLY) \
 		SYNTH_TECH=$(SYNTH_TECH) PROCESSOR_DIR=$(PROCESSOR_DIR) INC_DIR=$(INC_DIR) \
 		PROCESSOR_TOP=$(PROCESSOR_TOP) XLEN=$(XLEN) SYNTH_TOP=$(SYNTH_TOP)
 
@@ -225,6 +226,7 @@ bringup_test:
 .PHONY: coremark
 coremark:
 	@$(MAKE) -C $(COREMARK_DIR) \
+		WALLY=$(WALLY) \
 		XLEN=$(XLEN) ARCH="$(ARCH)" ABI=$(ABI) LINKER=$(LINKER) TOOLPREFIX=$(TOOLPREFIX)
 	@$(MAKE) run ELFS="$(COREMARK_DIR)/work/coremark.bare.riscv.elf"
 

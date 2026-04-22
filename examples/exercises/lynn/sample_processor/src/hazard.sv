@@ -9,6 +9,9 @@ module hazard (
     input logic [4:0] Rs1E, Rs2E,  // source registers in Execute stage
     input logic [4:0] RdE,  // destination register in Execute stage
     input logic PCSrcE,  // 1 if branch is taken
+input logic BranchE,
+    input logic PredictTakenE,
+
     input logic ResultSrcE0,  // 1 if lw is in execute stage
     input logic MulBusy,    // whether the multiply unit is currently busy processing a multiply instruction
     input logic [4:0] RdM,  // destination register in Memory stage
@@ -32,8 +35,17 @@ module hazard (
   assign StallD  = lwStall | MulBusy;
 
   // flush when a branch is taken or a load introduces a bubble
-  assign FlushD  = PCSrcE;
-  assign FlushE  = lwStall | PCSrcE;
+logic MispredictE;
+
+  // A mispredict occurs if:
+  // 1. It is a branch, and the actual outcome (PCSrcE) doesn't match our prediction.
+  // 2. It is a jump/JALR (PCSrcE is 1, but BranchE is 0). Since our current BTB
+  //    only predicts branches, jumps will always be a "mispredict" that need a flush.
+  assign MispredictE = BranchE ? (PCSrcE != PredictTakenE) : PCSrcE;
+
+  // Flush ONLY when a misprediction occurs or a load introduces a bubble
+  assign FlushD  = MispredictE;
+  assign FlushE  = lwStall | MispredictE;
 
   // forward to solve data hazards whenever possible
   always_comb begin
