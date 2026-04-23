@@ -35,10 +35,26 @@ module ifu (
   logic        PredictTakenF;
   logic [31:0] PredictedTargetF;
   logic        MispredictE;
-  logic        BTBHitF;
-  logic        UpdateBTBE;
 
-  assign UpdateBTBE = BranchE;
+  logic        BTBHitF;
+
+  // --- E to M Stage Pipeline Registers for BTB Update ---
+  logic [31:0] PCM, PCTargetM;
+  logic        BranchM, ActualTakenM;
+
+  always_ff @(posedge clk) begin
+      if (reset) begin
+          PCM          <= '0;
+          PCTargetM    <= '0;
+          BranchM      <= 1'b0;
+          ActualTakenM <= 1'b0;
+      end else begin
+          PCM          <= PCE;
+          PCTargetM    <= PCTargetE;
+          BranchM      <= BranchE;
+          ActualTakenM <= PCSrcE;
+      end
+  end
 
   // --- Initialization ---
   initial begin
@@ -49,23 +65,24 @@ module ifu (
 
   // branch predictor
   two_bit_predictor bp (
-      .clk,
-      .reset,
-      .PCF,
-      .PredictTakenF,
-      .PCE,
-      .BranchE,
-      .ActualTakenE(PCSrcE)
+      .clk(clk),
+      .reset(reset),
+      .PCF(PCF),
+      .PredictTakenF(PredictTakenF),
+      .PCM(PCM),
+      .BranchM(BranchM),
+      .ActualTakenM(ActualTakenM)
   );
+
   btb branch_buffer (
-      .clk,
-      .reset,
-      .PCF,
-      .PredictedTargetF,
-      .BTBHitF,
-      .PCE,
-      .PCTargetE,
-      .UpdateBTBE(BranchE)
+      .clk(clk),
+      .reset(reset),
+      .PCF(PCF),
+      .PredictedTargetF(PredictedTargetF),
+      .BTBHitF(BTBHitF),
+      .PCM(PCM),
+      .PCTargetM(PCTargetM),
+      .UpdateBTBM(BranchM)
   );
 
   assign MispredictE = BranchE ? (PCSrcE != PredictTakenE) : PCSrcE;

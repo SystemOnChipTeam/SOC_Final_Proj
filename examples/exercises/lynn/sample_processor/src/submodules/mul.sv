@@ -131,6 +131,10 @@ module mul #(parameter XLEN) (
   // mul working logic: used to give the multiply unit 2 extra cycles to compute the result
   logic [1:0] count;
   always_ff @(posedge clk) begin
+    if (reset)
+      count <= 2'b00;
+    else if (IsMulE & IsMulE1)  // already working on a multiply, so count up
+      count <= count + 1;
     if (IsMulE & ~IsMulE1)  // first cycle of a new multiply
       count <= 2'b00;
     else if (count == 2'b10)  // finished, reset for next
