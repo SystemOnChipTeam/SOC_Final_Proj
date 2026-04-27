@@ -26,7 +26,7 @@ module hazard (
 
   logic lwStall;
   // old: assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE)); // stalled due to lw dependency
-  assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE)) & (RdE != 5'b0);
+  assign lwStall = ResultSrcE0 & ((Rs1D == RdE) | (Rs2D == RdE)); //& (RdE != 5'b0)
 
   assign StallF  = lwStall | MulBusy;
   assign StallD  = lwStall | MulBusy;
