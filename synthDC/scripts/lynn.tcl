@@ -225,7 +225,7 @@ if {$drive == "FLOP"} {
 #####################################################################
 
 # Instruction memory read data (coming INTO chip)
-set_input_delay 2.5 -clock $my_clk -max [get_ports {Instr[*]}]
+set_input_delay 3.0 -clock $my_clk -max [get_ports {Instr[*]}]
 set_input_delay 0.2 -clock $my_clk -min [get_ports {Instr[*]}]
 
 # Instruction memory address (going OUT of chip)
