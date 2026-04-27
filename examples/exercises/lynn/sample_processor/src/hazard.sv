@@ -37,14 +37,14 @@ module hazard (
 
   // forward to solve data hazards whenever possible
   always_comb begin
-    if (((Rs1E == RdM) & RegWriteM) & (Rs1E != 5'b0)) ForwardAE = 2'b10;
-    else if (((Rs1E == RdW) & RegWriteW) & (Rs1E != 5'b0)) ForwardAE = 2'b01;
+    if (((Rs1E == RdM) & RegWriteM) & (|Rs1E)) ForwardAE = 2'b10;
+    else if (((Rs1E == RdW) & RegWriteW) & (|Rs1E)) ForwardAE = 2'b01;
     else ForwardAE = 2'b00;
   end
 
   always_comb begin
-    if (((Rs2E == RdM) & RegWriteM) & (Rs2E != 5'b0)) ForwardBE = 2'b10;
-    else if (((Rs2E == RdW) & RegWriteW) & (Rs2E != 5'b0)) ForwardBE = 2'b01;
+    if (((Rs2E == RdM) & RegWriteM) & (|Rs2E)) ForwardBE = 2'b10;
+    else if (((Rs2E == RdW) & RegWriteW) & (|Rs2E)) ForwardBE = 2'b01;
     else ForwardBE = 2'b00;
   end
 

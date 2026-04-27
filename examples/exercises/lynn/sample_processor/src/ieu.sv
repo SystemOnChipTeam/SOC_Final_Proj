@@ -2,6 +2,10 @@
 // RISC-V pipelined processor
 // pclark@hmc.edu mconine@hmc.edu 2026
 
+// ieu.sv
+// RISC-V pipelined processor
+// pclark@hmc.edu mconine@hmc.edu 2026
+
 module ieu(
         // Inputs Decode Stage
         input   logic           clk, reset,
@@ -40,7 +44,9 @@ module ieu(
         output  logic           MulWorking // whether we are currently processing a multiply instruction in execute stage
     );
 
+    // -----------------------------------------
     // Decode Stage internal signals
+    // -----------------------------------------
     logic        MemEnD, RegWriteD, MemWriteD;
     logic [1:0]  ResultSrcD;
     logic        JumpD, BranchD, ALUSrcD;
@@ -48,15 +54,29 @@ module ieu(
     logic [2:0]  ImmSrcD;
     logic [31:0] PCPlus4E;
 
+    // Datapath (D-stage) wires
+    logic [31:0] Rd1D, Rd2D, ImmExtD;
+    logic        CSRSrcD;
+    logic [31:0] CSRReadDataD;
+    logic        IsMulD;
+
     // Detect JALR in decode stage based on opcode
     logic        JalrD;
     assign JalrD = (InstrD[6:0] == 7'b1100111);
 
-    // Datapath (D-stage)
-    logic [31:0] Rd1D, Rd2D, ImmExtD;
+    // Combinational assignments
+    assign ResultSrcE0 = ResultSrcE[0];
+    assign Rs1D = InstrD[19:15];
+    assign Rs2D = InstrD[24:20];
 
+    // Shared Decode Data (Multiplex ImmExtD and CSRReadDataD)
+    logic [31:0] SharedDataD;
+    assign SharedDataD = CSRSrcD ? CSRReadDataD : ImmExtD;
+
+    // -----------------------------------------
     // Execute Stage internal signals
-    logic [31:0] Rd1E, Rd2E, PCE, ImmExtE;
+    // -----------------------------------------
+    logic [31:0] Rd1E, Rd2E, PCE, SharedDataE;
     logic        JumpE, BranchE, ALUSrcE, JalrE;
     logic [3:0]  ALUControlE;
     logic [31:0] SrcAE, SrcBE;
@@ -64,64 +84,58 @@ module ieu(
     logic        BranchTaken;
     logic [31:0] BranchTargetE;
     logic [31:0] ProdE;
-    logic        IsMulD, IsMulE; // whether the instruction in decode/execute stage is a multiply instruction
+    logic        IsMulE;
+    logic        CSRSrcE;
 
     // Writeback
     logic [31:0] ResultW;
 
-    // Combinational assignments
-    assign ResultSrcE0 = ResultSrcE[0];
-    assign Rs1D = InstrD[19:15];
-    assign Rs2D = InstrD[24:20];
-
-    logic        CSRSrcD;
-    logic [31:0] CSRReadDataD, CSRReadDataE;
-    logic        CSRSrcE;
-
+    // -----------------------------------------
+    // Decode Stage Modules
+    // -----------------------------------------
     controller c(.clk, .reset, .InstrD, .MemEnD, .RegWriteD, .ResultSrcD, .MemWriteD, .JumpD, .BranchD, .ALUControlD, .ALUSrcD, .ImmSrcD, .CSRSrcD, .IsMulD);
 
-    // TODO could move csr to other stage if blocking
-    csrfile csr(.clk(clk), .reset(reset), .CSRWrite(CSRSrcD), .CSRAdr(InstrD[31:20]), .RS1(Rd1D), .RetiredInstr(~StallE & ~FlushE), .Op(InstrD[6:0]), .Funct3(InstrD[14:12]), .Funct7(InstrD[31:25]), .PCSrc(BranchTaken), .CSRReadData(CSRReadDataD)
-    );
+    csrfile csr(.clk(clk), .reset(reset), .CSRWrite(CSRSrcD), .CSRAdr(InstrD[31:20]), .RS1(Rd1D), .RetiredInstr(~StallE & ~FlushE), .Op(InstrD[6:0]), .Funct3(InstrD[14:12]), .Funct7(InstrD[31:25]), .PCSrc(BranchTaken), .CSRReadData(CSRReadDataD));
 
-    // Register file logic
-    regfile rf(.clk, .WE3(RegWriteW), .A1(InstrD[19:15]), .A2(InstrD[24:20]),
-        .A3(RdW), .WD3(ResultW), .RD1(Rd1D), .RD2(Rd2D));
+    regfile rf(.clk, .WE3(RegWriteW), .A1(InstrD[19:15]), .A2(InstrD[24:20]), .A3(RdW), .WD3(ResultW), .RD1(Rd1D), .RD2(Rd2D));
 
-    // extender
     extend ext(.Instr(InstrD[31:7]), .ImmSrc(ImmSrcD), .ImmExt(ImmExtD));
 
-    // TODO make struct for these
-    // Pipeline Register E-Stage
-    flopenrc #(1) IsMulEReg    (clk, reset, FlushE, ~StallE, IsMulD,     IsMulE);
-    flopenrc #(1) MemEnEReg    (clk, reset, FlushE, ~StallE, MemEnD,     MemEnE);
-    flopenrc #(1) RegWriteEReg (clk, reset, FlushE, ~StallE, RegWriteD,  RegWriteE);
-    flopenrc #(2) ResultSrcEReg(clk, reset, FlushE, ~StallE, ResultSrcD, ResultSrcE);
-    flopenrc #(1) MemWriteEReg (clk, reset, FlushE, ~StallE, MemWriteD,  MemWriteE);
-    flopenrc #(1) JumpEReg     (clk, reset, FlushE, ~StallE, JumpD,      JumpE);
-    flopenrc #(1) BranchEReg   (clk, reset, FlushE, ~StallE, BranchD,    BranchE);
-    flopenrc #(4) ALUControlEReg(clk, reset, FlushE, ~StallE, ALUControlD, ALUControlE);
-    flopenrc #(1) ALUSrcEReg   (clk, reset, FlushE, ~StallE, ALUSrcD,    ALUSrcE);
-    flopenrc #(1) JalrEReg     (clk, reset, FlushE, ~StallE, JalrD,      JalrE);
-    flopenrc #(1)  CSRSrcEReg     (clk, reset, FlushE, ~StallE, CSRSrcD,      CSRSrcE);
-    flopenrc #(32) CSRReadDataEReg(clk, reset, FlushE, ~StallE, CSRReadDataD, CSRReadDataE);
+    // -----------------------------------------
+    // Pipeline Registers (D -> E)
+    // -----------------------------------------
+    flopenrc #(1)  IsMulEReg      (clk, reset, FlushE, ~StallE, IsMulD,      IsMulE);
+    flopenrc #(1)  MemEnEReg      (clk, reset, FlushE, ~StallE, MemEnD,      MemEnE);
+    flopenrc #(1)  RegWriteEReg   (clk, reset, FlushE, ~StallE, RegWriteD,   RegWriteE);
+    flopenrc #(2)  ResultSrcEReg  (clk, reset, FlushE, ~StallE, ResultSrcD,  ResultSrcE);
+    flopenrc #(1)  MemWriteEReg   (clk, reset, FlushE, ~StallE, MemWriteD,   MemWriteE);
+    flopenrc #(1)  JumpEReg       (clk, reset, FlushE, ~StallE, JumpD,       JumpE);
+    flopenrc #(1)  BranchEReg     (clk, reset, FlushE, ~StallE, BranchD,     BranchE);
+    flopenrc #(4)  ALUControlEReg (clk, reset, FlushE, ~StallE, ALUControlD, ALUControlE);
+    flopenrc #(1)  ALUSrcEReg     (clk, reset, FlushE, ~StallE, ALUSrcD,     ALUSrcE);
+    flopenrc #(1)  JalrEReg       (clk, reset, FlushE, ~StallE, JalrD,       JalrE);
+    flopenrc #(1)  CSRSrcEReg     (clk, reset, FlushE, ~StallE, CSRSrcD,     CSRSrcE);
 
     // Datapath registers
-    flopenrc #(32) RD1EReg(clk, reset, FlushE, ~StallE, Rd1D, Rd1E);
-    flopenrc #(32) RD2EReg(clk, reset, FlushE, ~StallE, Rd2D, Rd2E);
-    flopenrc #(32) PCEReg(clk, reset, FlushE, ~StallE, PCD, PCE);
-    flopenrc #(5)  Rs1EReg(clk, reset, FlushE, ~StallE, InstrD[19:15], Rs1E);
-    flopenrc #(5)  Rs2EReg(clk, reset, FlushE, ~StallE, InstrD[24:20], Rs2E);
-    flopenrc #(5)  RdEReg(clk, reset, FlushE, ~StallE, InstrD[11:7], RdE);
+    flopenrc #(32) RD1EReg        (clk, reset, FlushE, ~StallE, Rd1D, Rd1E);
+    flopenrc #(32) RD2EReg        (clk, reset, FlushE, ~StallE, Rd2D, Rd2E);
+    flopenrc #(32) PCEReg         (clk, reset, FlushE, ~StallE, PCD, PCE);
+    flopenrc #(5)  Rs1EReg        (clk, reset, FlushE, ~StallE, InstrD[19:15], Rs1E);
+    flopenrc #(5)  Rs2EReg        (clk, reset, FlushE, ~StallE, InstrD[24:20], Rs2E);
+    flopenrc #(5)  RdEReg         (clk, reset, FlushE, ~StallE, InstrD[11:7], RdE);
 
-    flopenrc #(32) ImmExtEReg(clk, reset, FlushE, ~StallE, ImmExtD, ImmExtE);
-    flopenrc #(32) PCPlus4EReg(clk, reset, FlushE, ~StallE, PCPlus4D, PCPlus4E);
-    flopenrc #(3)  Funct3EReg(clk, reset, FlushE, ~StallE, InstrD[14:12], Funct3E);
+    // The new shared 32-bit register replaces ImmExtEReg and CSRReadDataEReg
+    flopenrc #(32) SharedDataEReg (clk, reset, FlushE, ~StallE, SharedDataD, SharedDataE);
 
-    // Datapath Forwarding
+    flopenrc #(32) PCPlus4EReg    (clk, reset, FlushE, ~StallE, PCPlus4D, PCPlus4E);
+    flopenrc #(3)  Funct3EReg     (clk, reset, FlushE, ~StallE, InstrD[14:12], Funct3E);
+
+    // -----------------------------------------
+    // Datapath Forwarding & Execute Stage
+    // -----------------------------------------
     mux3 #(32) ForwardmuxA(Rd1E, ResultW, ALUResultM, ForwardAE, SrcAE);
     mux3 #(32) ForwardmuxB(Rd2E, ResultW, ALUResultM, ForwardBE, WriteDataE);
-    mux2 #(32) srcbmux(WriteDataE, ImmExtE, ALUSrcE, SrcBE);
+    mux2 #(32) srcbmux(WriteDataE, SharedDataE, ALUSrcE, SrcBE);
 
     // Execute stage modules
     logic [31:0] ALUResult_Raw;
@@ -133,11 +147,11 @@ module ieu(
     logic [31:0] ALUOutE;
     always_comb
         if      (IsMulE)   ALUOutE = ProdE;          // MUL/MULH/MULHSU/MULHU
-        else if (CSRSrcE)  ALUOutE = CSRReadDataE;   // CSR
+        else if (CSRSrcE)  ALUOutE = SharedDataE;    // CSR
         else               ALUOutE = ALUResult_Raw;  // normal ALU
 
     // Branch/Jump Target Logic
-    adder pcadder(PCE, ImmExtE, BranchTargetE);
+    adder pcadder(PCE, SharedDataE, BranchTargetE);
     assign PCTargetE = JalrE ? (ALUOutE & 32'hFFFFFFFE) : BranchTargetE;
 
     // Output the final ALUResultE to the rest of the pipeline
@@ -163,7 +177,6 @@ module ieu(
     assign PCSrcE = (BranchE & BranchTaken) | JumpE | JalrE;
 
     // Writeback mux
-
     assign ResultW = (ResultSrcW == 2'b01) ? ReadDataW : ALUResultW;
 
 endmodule
