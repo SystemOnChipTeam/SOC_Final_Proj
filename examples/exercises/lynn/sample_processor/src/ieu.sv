@@ -152,7 +152,10 @@ module ieu(
 
     // Branch/Jump Target Logic
     adder pcadder(PCE, SharedDataE, BranchTargetE);
-    assign PCTargetE = JalrE ? (ALUOutE & 32'hFFFFFFFE) : BranchTargetE;
+    // assign PCTargetE = JalrE ? (ALUOutE & 32'hFFFFFFFE) : BranchTargetE;
+    logic [31:1] TargetUpper;
+    assign TargetUpper = JalrE ? ALUOutE[31:1] : BranchTargetE[31:1];
+    assign PCTargetE = {TargetUpper, 1'b0};
 
     // Output the final ALUResultE to the rest of the pipeline
     always_comb
@@ -163,16 +166,18 @@ module ieu(
         endcase
 
     // PCSrcE logic
-    always_comb
-        case (Funct3E)
-            3'b000: BranchTaken = FlagsE[0];   // BEQ
-            3'b001: BranchTaken = ~FlagsE[0];  // BNE
-            3'b100: BranchTaken = FlagsE[1];   // BLT
-            3'b101: BranchTaken = ~FlagsE[1];  // BGE
-            3'b110: BranchTaken = FlagsE[2];   // BLTU
-            3'b111: BranchTaken = ~FlagsE[2];  // BGEU
-            default: BranchTaken = 1'b0;
+    logic base_flag;
+    always_comb begin
+        case (Funct3E[2:1])
+            2'b00: base_flag = FlagsE[0]; // BEQ / BNE
+            2'b10: base_flag = FlagsE[1]; // BLT / BGE
+            2'b11: base_flag = FlagsE[2]; // BLTU / BGEU
+            default: base_flag = 1'b0;
         endcase
+    end
+
+    // Funct3E[0] elegantly handles the inversion for BNE, BGE, BGEU
+    assign BranchTaken = base_flag ^ Funct3E[0];
 
     assign PCSrcE = (BranchE & BranchTaken) | JumpE | JalrE;
 
