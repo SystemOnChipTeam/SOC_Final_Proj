@@ -2,7 +2,6 @@
 // RISC-V pipelined processor
 // pclark@hmc.edu mconine@hmc.edu 2026
 
-
 module hazard (
     // Inputs
     input logic [4:0] Rs1D, Rs2D,  // source registers in Decode stage

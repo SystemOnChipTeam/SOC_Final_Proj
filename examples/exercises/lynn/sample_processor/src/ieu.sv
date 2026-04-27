@@ -2,10 +2,6 @@
 // RISC-V pipelined processor
 // pclark@hmc.edu mconine@hmc.edu 2026
 
-// ieu.sv
-// RISC-V pipelined processor
-// pclark@hmc.edu mconine@hmc.edu 2026
-
 module ieu(
         // Inputs Decode Stage
         input   logic           clk, reset,
