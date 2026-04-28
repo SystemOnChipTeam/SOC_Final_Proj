@@ -11,7 +11,6 @@ module ieu(
 
         // Outputs Execute Stage
         output  logic           MemEnE, RegWriteE,
-        output  logic [1:0]     ResultSrcE,
         output  logic           MemWriteE,
         output  logic [31:0]    ALUResultE,
         output  logic [31:0]    WriteDataE,
@@ -23,7 +22,6 @@ module ieu(
 
         // Inputs Writeback Stage
         input   logic           RegWriteW,
-        input   logic [1:0]     ResultSrcW,
         input   logic [31:0]    ALUResultW,
         input   logic [31:0]    ReadDataW,
         input   logic [4:0]     RdW,
@@ -32,7 +30,7 @@ module ieu(
         output  logic [4:0]     Rs1D, Rs2D,
 
         // Hazard Unit Execute Stage Interface
-        input   logic           StallE, FlushE,
+        input   logic           StallE, FlushE, StallM, FlushM, StallW, FlushW,
         input   logic [1:0]     ForwardAE, ForwardBE,
         output  logic [4:0]     Rs1E, Rs2E, RdE,
         output  logic           PCSrcE,
@@ -44,7 +42,7 @@ module ieu(
     // Decode Stage internal signals
     // -----------------------------------------
     logic        MemEnD, RegWriteD, MemWriteD;
-    logic [1:0]  ResultSrcD;
+    logic [1:0]  ResultSrcD, ResultSrcE;
     logic        JumpD, BranchD, ALUSrcD;
     logic [3:0]  ALUControlD;
     logic [2:0]  ImmSrcD;
@@ -177,7 +175,14 @@ module ieu(
 
     assign PCSrcE = (BranchE & BranchTaken) | JumpE | JalrE;
 
+    // Derive "is this a load" combinationally in E stage (ResultSrc == 2'b01)
+    logic IsLoadE, IsLoadM, IsLoadW;
+    assign IsLoadE = (ResultSrcE == 2'b01);
+
+    flopenrc #(1) IsLoadMReg(clk, reset, FlushM, ~StallM, IsLoadE, IsLoadM);
+    flopenrc #(1) IsLoadWReg(clk, reset, FlushW, ~StallW, IsLoadM, IsLoadW);
+
     // Writeback mux
-    assign ResultW = (ResultSrcW == 2'b01) ? ReadDataW : ALUResultW;
+    assign ResultW = IsLoadW ? ReadDataW : ALUResultW;
 
 endmodule

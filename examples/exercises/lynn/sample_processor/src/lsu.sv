@@ -7,7 +7,6 @@ module lsu(
         input   logic           clk, reset,
         input   logic           MemEnE,     // Memory enable
         input   logic           RegWriteE,  // Register file write enable
-        input   logic   [1:0]   ResultSrcE, // Result source selector
         input   logic           MemWriteE,  // Memory write enable
         input   logic   [31:0]  ALUResultE, // ALU result
         input   logic   [31:0]  WriteDataE, // Data to write to memory
@@ -21,7 +20,6 @@ module lsu(
 
         // Outputs
         output  logic         RegWriteW,                         // register file write enable in Writeback stage
-        output  logic   [1:0]   ResultSrcW,                      // Result source selector in Writeback stage
         output  logic   [31:0]  ALUResultW, ReadDataW, // ALU result, memory read data, and PC+4 value in Writeback stage
         output  logic   [4:0]   RdW,                             // Destination register in Writeback stage
 
@@ -35,14 +33,12 @@ module lsu(
     );
 
     // Declare internal signals
-    logic   [1:0]   ResultSrcM;                      // Result source selector in Memory stage
     logic   [31:0]  WriteDataM, ReadDataM; // Data to write to memory, data read from memory, and PC+4 value in Memory stage
     logic   [2:0]   Funct3M;                         // Function 3 field in Memory stage
 
     // Pipeline Register M-Stage
     flopenrc #(1)  MemEnMReg    (clk, reset, FlushM, ~StallM, MemEnE,    MemEnM);
     flopenrc #(1)  RegWriteMReg (clk, reset, FlushM, ~StallM, RegWriteE, RegWriteM);
-    flopenrc #(2)  ResultSrcMReg(clk, reset, FlushM, ~StallM, ResultSrcE,ResultSrcM);
     flopenrc #(1)  MemWriteMReg (clk, reset, FlushM, ~StallM, MemWriteE, MemWriteM);
     flopenrc #(32) ALUResultMReg(clk, reset, FlushM, ~StallM, ALUResultE,ALUResultM);
     flopenrc #(32) WriteDataMReg(clk, reset, FlushM, ~StallM, WriteDataE,WriteDataM);
@@ -88,7 +84,6 @@ module lsu(
 
     // Writeback Stage Pipeline Register
     flopenrc #(1)  RegWriteWReg (clk, reset, FlushW, ~StallW, RegWriteM, RegWriteW);
-    flopenrc #(2)  ResultSrcWReg(clk, reset, FlushW, ~StallW, ResultSrcM,ResultSrcW);
     flopenrc #(32) ALUResultWReg(clk, reset, FlushW, ~StallW, ALUResultM,ALUResultW);
     flopenrc #(32) ReadDataWReg (clk, reset, FlushW, ~StallW, ReadDataM, ReadDataW);
     flopenrc #(5)  RdWReg       (clk, reset, FlushW, ~StallW, RdM, RdW);
