@@ -28,8 +28,7 @@ module riscvsingle (
 
     // IEU to LSU (Execute stage)
     logic        MemEnE, RegWriteE, MemWriteE;
-    logic [1:0]  ResultSrcE;
-    logic [31:0] ALUResultE, WriteDataE, PCPlus4E;
+    logic [31:0] ALUResultE, WriteDataE;
     logic [2:0]  Funct3E;
     logic [4:0]  RdE;
 
@@ -39,10 +38,8 @@ module riscvsingle (
 
     // LSU to IEU (Writeback stage)
     logic        RegWriteW;
-    logic [1:0]  ResultSrcW;
-    logic [31:0] ALUResultW, ReadDataW, PCPlus4W;
+    logic [31:0] ALUResultW, ReadDataW;
     logic [4:0]  RdW;
-    logic [31:0] PCTargetW;
 
     // Hazard unit outputs to IFU/IEU/LSU
     logic        StallF, StallD, FlushD;
@@ -57,6 +54,7 @@ module riscvsingle (
     logic        ResultSrcE0;
     logic [4:0]  RdM;
     logic        RegWriteM;
+    logic        MulWorking;
 
     ifu ifu(
         .clk, .reset,
@@ -77,35 +75,35 @@ module riscvsingle (
         // Decode stage inputs
         .InstrD, .PCD, .PCPlus4D,
         // Execute stage outputs
-        .MemEnE, .RegWriteE, .ResultSrcE, .MemWriteE,
-        .ALUResultE, .WriteDataE, .Funct3E, .PCPlus4E,
-        .PCTargetE,
+        .MemEnE, .RegWriteE, .MemWriteE,
+        .ALUResultE, .WriteDataE, .Funct3E, .PCTargetE,
         // Memory stage input (forwarding)
         .ALUResultM,
         // Writeback stage inputs
-        .RegWriteW, .ResultSrcW,
-        .ALUResultW, .ReadDataW, .PCPlus4W, .RdW, .PCTargetW,
+        .RegWriteW,
+        .ALUResultW, .ReadDataW, .RdW,
         // Hazard unit — Decode
         .Rs1D, .Rs2D,
         // Hazard unit — Execute
-        .StallE, .FlushE,
+        .StallE, .FlushE, .StallM, .FlushM, .StallW, .FlushW,
         .ForwardAE, .ForwardBE,
         .Rs1E, .Rs2E, .RdE,
         .PCSrcE,
-        .ResultSrcE0
+        .ResultSrcE0,
+        .MulWorking
     );
 
     lsu lsu(
         .clk, .reset,
         // Execute stage inputs
-        .MemEnE, .RegWriteE, .ResultSrcE, .MemWriteE,
-        .ALUResultE, .WriteDataE, .RdE, .PCPlus4E, .Funct3E, .PCTargetE,
+        .MemEnE, .RegWriteE, .MemWriteE,
+        .ALUResultE, .WriteDataE, .RdE, .Funct3E,
         .StallM, .FlushM,
         .StallW, .FlushW,
         .RdM, .RegWriteM,
         // Writeback outputs to IEU
-        .RegWriteW, .ResultSrcW,
-        .ALUResultW, .ReadDataW, .PCPlus4W, .RdW, .PCTargetW,
+        .RegWriteW,
+        .ALUResultW, .ReadDataW, .RdW,
         // DTIM interface
         .ALUResultM,
         .DataOutM(ReadData),
@@ -117,13 +115,13 @@ module riscvsingle (
 
     hazard hzu(
         // Inputs
-        .clk, .reset,
         // Decode stage
         .Rs1D, .Rs2D,
         // Execute stage
         .Rs1E, .Rs2E, .RdE,
         .PCSrcE,
         .ResultSrcE0,
+        .MulBusy(MulWorking),
         // Memory stage
         .RdM, .RegWriteM,
         // Writeback stage

@@ -275,6 +275,9 @@ if {$tech != "tsmc28psyn"} {
 
 # Attempt Area Recovery - if looking for minimal area
 # set_max_area 2000
+set_max_area 0
+set_max_leakage_power 0
+set_max_dynamic_power 0
 
 # Set fanout
 set_max_fanout 6 $all_in_ex_clk
@@ -296,7 +299,7 @@ set_fix_multiple_port_nets -all -buffer_constants
 
 # Compile statements
 if { $maxopt == 1 } {
-    compile_ultra -retime
+    compile_ultra -gate_clock -retime
     optimize_registers
 } else {
     compile_ultra -no_seq_output_inversion -no_boundary_optimization
