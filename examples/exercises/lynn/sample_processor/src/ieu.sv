@@ -1,46 +1,46 @@
 // ieu.sv
 // RISC-V pipelined processor
+// Max Conine and Pierce Clark
 // pclark@hmc.edu mconine@hmc.edu 2026
 
 module ieu(
-        // Inputs Decode Stage
+        // Decode Stage Inputs
         input   logic           clk, reset,
-        input   logic [31:0]    InstrD,
-        input   logic [31:0]    PCD,
-        input   logic [31:0]    PCPlus4D,
+        input   logic [31:0]    InstrD,     // 32-bit instruction
+        input   logic [31:0]    PCD,        // Program Counter
+        input   logic [31:0]    PCPlus4D,   // PC + 4
 
-        // Outputs Execute Stage
-        output  logic           MemEnE, RegWriteE,
-        output  logic           MemWriteE,
-        output  logic [31:0]    ALUResultE,
-        output  logic [31:0]    WriteDataE,
-        output  logic [2:0]     Funct3E,
-        output  logic [31:0]    PCTargetE,
+        // Execute Stage Outputs
+        output  logic           MemEnE,     // Memory access enable
+        output  logic           RegWriteE,  // Register file write enable
+        output  logic           MemWriteE,  // Data memory write enable
+        output  logic [31:0]    ALUResultE, // ALU result or memory address
+        output  logic [31:0]    WriteDataE, // Data to store in memory
+        output  logic [2:0]     Funct3E,    // funct3 for memory/branch ops
+        output  logic [31:0]    PCTargetE,  // Target PC for branches/jumps
 
-        // Inputs Memory Stage
-        input logic [31:0] ALUResultM,
+        // Memory Stage Inputs
+        input logic [31:0]      ALUResultM, // Forwarded ALU result from M
 
-        // Inputs Writeback Stage
-        input   logic           RegWriteW,
-        input   logic [31:0]    ALUResultW,
-        input   logic [31:0]    ReadDataW,
-        input   logic [4:0]     RdW,
+        // Writeback Stage Inputs
+        input   logic           RegWriteW,  // Writeback register write enable
+        input   logic [31:0]    ALUResultW, // Forwarded ALU result from W
+        input   logic [31:0]    ReadDataW,  // Forwarded memory data from W
+        input   logic [4:0]     RdW,        // Writeback destination register
 
         // Hazard Unit Decode Stage Interface
-        output  logic [4:0]     Rs1D, Rs2D,
+        output  logic [4:0]     Rs1D, Rs2D, // Source regs for stall detection
 
         // Hazard Unit Execute Stage Interface
-        input   logic           StallE, FlushE, StallM, FlushM, StallW, FlushW,
-        input   logic [1:0]     ForwardAE, ForwardBE,
-        output  logic [4:0]     Rs1E, Rs2E, RdE,
-        output  logic           PCSrcE,
-        output  logic           ResultSrcE0,
-        output  logic           MulWorking // whether we are currently processing a multiply instruction in execute stage
+        input   logic           StallE, FlushE, StallM, FlushM, StallW, FlushW, // Stall and flush signals from hazard unit
+        input   logic [1:0]     ForwardAE, ForwardBE, // Forwarding mux selects
+        output  logic [4:0]     Rs1E, Rs2E, RdE,      // Registers for forwarding logic
+        output  logic           PCSrcE,               // Take branch/jump flag
+        output  logic           ResultSrcE0,          // Load instruction flag (ResultSrc[0])
+        output  logic           MulWorking            // Whether we are currently processing a multiply instruction in execute stage
     );
 
-    // -----------------------------------------
     // Decode Stage internal signals
-    // -----------------------------------------
     logic        MemEnD, RegWriteD, MemWriteD;
     logic [1:0]  ResultSrcD, ResultSrcE;
     logic        JumpD, BranchD, ALUSrcD;
@@ -67,9 +67,7 @@ module ieu(
     logic [31:0] SharedDataD;
     assign SharedDataD = CSRSrcD ? CSRReadDataD : ImmExtD;
 
-    // -----------------------------------------
     // Execute Stage internal signals
-    // -----------------------------------------
     logic [31:0] Rd1E, Rd2E, PCE, SharedDataE;
     logic        JumpE, BranchE, ALUSrcE, JalrE;
     logic [3:0]  ALUControlE;
@@ -84,9 +82,7 @@ module ieu(
     // Writeback
     logic [31:0] ResultW;
 
-    // -----------------------------------------
     // Decode Stage Modules
-    // -----------------------------------------
     controller c(.clk, .reset, .InstrD, .MemEnD, .RegWriteD, .ResultSrcD, .MemWriteD, .JumpD, .BranchD, .ALUControlD, .ALUSrcD, .ImmSrcD, .CSRSrcD, .IsMulD);
 
     csrfile csr(.clk(clk), .reset(reset), .CSRWrite(CSRSrcD), .CSRAdr(InstrD[31:20]), .RS1(Rd1D), .RetiredInstr(~StallE & ~FlushE), .Op(InstrD[6:0]), .Funct3(InstrD[14:12]), .Funct7(InstrD[31:25]), .PCSrc(BranchTaken), .CSRReadData(CSRReadDataD));
@@ -95,9 +91,7 @@ module ieu(
 
     extend ext(.Instr(InstrD[31:7]), .ImmSrc(ImmSrcD), .ImmExt(ImmExtD));
 
-    // -----------------------------------------
     // Pipeline Registers (D -> E)
-    // -----------------------------------------
     flopenrc #(1)  IsMulEReg      (clk, reset, FlushE, ~StallE, IsMulD,      IsMulE);
     flopenrc #(1)  MemEnEReg      (clk, reset, FlushE, ~StallE, MemEnD,      MemEnE);
     flopenrc #(1)  RegWriteEReg   (clk, reset, FlushE, ~StallE, RegWriteD,   RegWriteE);
@@ -124,9 +118,7 @@ module ieu(
     flopenrc #(32) PCPlus4EReg    (clk, reset, FlushE, ~StallE, PCPlus4D, PCPlus4E);
     flopenrc #(3)  Funct3EReg     (clk, reset, FlushE, ~StallE, InstrD[14:12], Funct3E);
 
-    // -----------------------------------------
     // Datapath Forwarding & Execute Stage
-    // -----------------------------------------
     mux3 #(32) ForwardmuxA(Rd1E, ResultW, ALUResultM, ForwardAE, SrcAE);
     mux3 #(32) ForwardmuxB(Rd2E, ResultW, ALUResultM, ForwardBE, WriteDataE);
     mux2 #(32) srcbmux(WriteDataE, SharedDataE, ALUSrcE, SrcBE);
@@ -146,7 +138,6 @@ module ieu(
 
     // Branch/Jump Target Logic
     adder pcadder(PCE, SharedDataE, BranchTargetE);
-    // assign PCTargetE = JalrE ? (ALUOutE & 32'hFFFFFFFE) : BranchTargetE;
     logic [31:1] TargetUpper;
     assign TargetUpper = JalrE ? ALUOutE[31:1] : BranchTargetE[31:1];
     assign PCTargetE = {TargetUpper, 1'b0};
@@ -170,12 +161,10 @@ module ieu(
         endcase
     end
 
-    // Funct3E[0] elegantly handles the inversion for BNE, BGE, BGEU
+    // XOR with base flag for branch taken logic (BEQ vs BNE, BLT vs BGE, BLTU vs BGEU)
     assign BranchTaken = base_flag ^ Funct3E[0];
-
     assign PCSrcE = (BranchE & BranchTaken) | JumpE | JalrE;
 
-    // Derive "is this a load" combinationally in E stage (ResultSrc == 2'b01)
     logic IsLoadE, IsLoadM, IsLoadW;
     assign IsLoadE = (ResultSrcE == 2'b01);
 

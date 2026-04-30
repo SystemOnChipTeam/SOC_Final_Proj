@@ -1,5 +1,7 @@
 // regfile.sv
 // RISC-V pipelined processor
+// Max Conine and Pierce Clark
+// pclark@hmc.edu mconine@hmc.edu 2026
 
 module regfile(
         input   logic           clk,

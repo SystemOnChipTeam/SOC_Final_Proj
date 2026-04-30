@@ -1,10 +1,11 @@
 // alu.sv
 // RISC-V pipelined processor
+// Max Conine and Pierce Clark
 // pclark@hmc.edu mconine@hmc.edu 2026
 
 module alu (
-    input  logic [31:0] SrcA,  // ALU input A
-    input  logic [31:0] SrcB,  // ALU input B
+    input  logic [31:0] SrcA,        // ALU input A
+    input  logic [31:0] SrcB,        // ALU input B
     input  logic [ 3:0] ALUControl,  // ALU control signal
     output logic [31:0] ALUResult    // ALU output
 );

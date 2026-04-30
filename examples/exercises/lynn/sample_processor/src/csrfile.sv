@@ -1,6 +1,7 @@
 // csrfile.sv
-// RISC-V CSR Register File
-// Supports Zicntr compliance and Custom Telemetry
+// RISC-V multi-cycle processor
+// Max Conine and Pierce Clark
+// pclark@hmc.edu mconine@hmc.edu 2026
 
 // TODO parameterize this to optimize area for coremark test.
 module csrfile (

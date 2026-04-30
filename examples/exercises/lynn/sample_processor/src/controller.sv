@@ -6,9 +6,10 @@
 module controller (
     input logic clk,
     reset,
-    // -- inputs --
+    // inputs
     input logic [31:0] InstrD,  // Instruction in Decode stage
-    // -- outputs --
+
+    // outputs
     output logic MemEnD,            // memory enable for load/store instructions
     output logic RegWriteD,         // MemEnD for load/store, RegWriteD for register file write enable
     output logic [1:0]  ResultSrcD, // Selects value to write to register file: 00 = ALU result, 01 = ReadData, 10 = PC+4, 11 = PCTarget (for AUIPC)
