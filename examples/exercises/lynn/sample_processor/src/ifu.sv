@@ -6,8 +6,12 @@
 module ifu(
         // Inputs
         input   logic           clk, reset,
-        input   logic           PCSrcE,    // Program Counter source, 1 if branch is taken
-        input   logic [31:0]    PCTargetE, // Target address from Execute stage for branch/jump instructions
+
+        // Branch Prediction Interface
+        input   logic           PredictTakenD,
+        input   logic [31:0]    PredictedTargetD,
+        input   logic           MispredictE,
+        input   logic [31:0]    RecoveryPCE,
 
         // Stalls
         input   logic           StallF,    // stall the Fetch stage
@@ -37,8 +41,15 @@ module ifu(
         $display("[TB] ENTRY_ADDR = 0x%h", entry_addr);
     end
 
-    // PC mux: Choose between sequential PC+4 or a branch/jump target from Execute
-    mux2 #(32) pcmux(PCPlus4F, PCTargetE, PCSrcE, PCNext);
+    // PC Priority Mux:
+    // 1. If Execute mispredicted, recover immediately.
+    // 2. Else if Decode predicts taken (backwards branch or JAL), take it.
+    // 3. Else proceed sequentially.
+    always_comb begin
+        if (MispredictE)        PCNext = RecoveryPCE;
+        else if (PredictTakenD) PCNext = PredictedTargetD;
+        else                    PCNext = PCPlus4F;
+    end
 
     // PC Register with Reset to entry_addr and Enable (StallF)
     always_ff @(posedge clk) begin

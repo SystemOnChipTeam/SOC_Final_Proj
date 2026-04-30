@@ -17,7 +17,6 @@ module ieu(
         output  logic [31:0]    ALUResultE, // ALU result or memory address
         output  logic [31:0]    WriteDataE, // Data to store in memory
         output  logic [2:0]     Funct3E,    // funct3 for memory/branch ops
-        output  logic [31:0]    PCTargetE,  // Target PC for branches/jumps
 
         // Memory Stage Inputs
         input logic [31:0]      ALUResultM, // Forwarded ALU result from M
@@ -35,7 +34,13 @@ module ieu(
         input   logic           StallE, FlushE, StallM, FlushM, StallW, FlushW, // Stall and flush signals from hazard unit
         input   logic [1:0]     ForwardAE, ForwardBE, // Forwarding mux selects
         output  logic [4:0]     Rs1E, Rs2E, RdE,      // Registers for forwarding logic
-        output  logic           PCSrcE,               // Take branch/jump flag
+
+        // Branch Prediction Interface
+        output  logic           PredictTakenD,        // Prediction made in Decode
+        output  logic [31:0]    PredictedTargetD,     // Predicted target address in Decode
+        output  logic           MispredictE,          // Flag if prediction was wrong in Execute
+        output  logic [31:0]    RecoveryPCE,          // Correct PC to recover to if mispredicted
+
         output  logic           ResultSrcE0,          // Load instruction flag (ResultSrc[0])
         output  logic           MulWorking            // Whether we are currently processing a multiply instruction in execute stage
     );
@@ -67,6 +72,15 @@ module ieu(
     logic [31:0] SharedDataD;
     assign SharedDataD = CSRSrcD ? CSRReadDataD : ImmExtD;
 
+    // Predict branches taken if offset is negative (ImmExtD[31]).
+    // Predict JAL (JumpD & ~JalrD) as always taken.
+    assign PredictedTargetD = PCD + ImmExtD;
+    assign PredictTakenD = (BranchD & ImmExtD[31]) | (JumpD & ~JalrD);
+
+    // Pipeline Register for Prediction
+    logic PredictTakenE;
+    flopenrc #(1) PredictTakenEReg (clk, reset, FlushE, ~StallE, PredictTakenD, PredictTakenE);
+
     // Execute Stage internal signals
     logic [31:0] Rd1E, Rd2E, PCE, SharedDataE;
     logic        JumpE, BranchE, ALUSrcE, JalrE;
@@ -75,6 +89,7 @@ module ieu(
     logic [2:0]  FlagsE;
     logic        BranchTaken;
     logic [31:0] BranchTargetE;
+    logic [31:0] PCTargetE; // Moved from output port to internal logic
     logic [31:0] ProdE;
     logic        IsMulE;
     logic        CSRSrcE;
@@ -150,7 +165,7 @@ module ieu(
             default: ALUResultE = ALUOutE;    // LW / SW / R-Type / I-Type / CSR / MUL
         endcase
 
-    // PCSrcE logic
+    // Execute stage actual taken logic
     logic base_flag;
     always_comb begin
         case (Funct3E[2:1])
@@ -163,7 +178,18 @@ module ieu(
 
     // XOR with base flag for branch taken logic (BEQ vs BNE, BLT vs BGE, BLTU vs BGEU)
     assign BranchTaken = base_flag ^ Funct3E[0];
-    assign PCSrcE = (BranchE & BranchTaken) | JumpE | JalrE;
+
+
+    logic ActualTakenE;
+    assign ActualTakenE = (BranchE & BranchTaken) | JumpE | JalrE;
+
+    // We mispredicted if our prediction doesn't match reality
+    assign MispredictE = ActualTakenE ^ PredictTakenE;
+
+    // If we mispredicted, where do we go?
+    // If it was actually taken (but we predicted NT), go to target.
+    // If it was actually NOT taken (but we predicted T), go to PC+4.
+    assign RecoveryPCE = ActualTakenE ? PCTargetE : PCPlus4E;
 
     logic IsLoadE, IsLoadM, IsLoadW;
     assign IsLoadE = (ResultSrcE == 2'b01);
