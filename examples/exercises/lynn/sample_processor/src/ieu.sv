@@ -85,7 +85,7 @@ module ieu(
     // Decode Stage Modules
     controller c(.clk, .reset, .InstrD, .MemEnD, .RegWriteD, .ResultSrcD, .MemWriteD, .JumpD, .BranchD, .ALUControlD, .ALUSrcD, .ImmSrcD, .CSRSrcD, .IsMulD);
 
-    csrfile csr(.clk(clk), .reset(reset), .CSRWrite(CSRSrcD), .CSRAdr(InstrD[31:20]), .RS1(Rd1D), .RetiredInstr(~StallE & ~FlushE), .Op(InstrD[6:0]), .Funct3(InstrD[14:12]), .Funct7(InstrD[31:25]), .PCSrc(BranchTaken), .CSRReadData(CSRReadDataD));
+    csrfile csr(.clk(clk), .reset(reset), .CSRAdr(InstrD[31:20]), .RetiredInstr(~StallE & ~FlushE), .CSRReadData(CSRReadDataD));
 
     regfile rf(.clk, .WE3(RegWriteW), .A1(InstrD[19:15]), .A2(InstrD[24:20]), .A3(RdW), .WD3(ResultW), .RD1(Rd1D), .RD2(Rd2D));
 
