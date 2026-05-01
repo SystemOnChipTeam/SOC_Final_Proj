@@ -6,11 +6,12 @@
 module hazard (
     // Decode Stage Inputs
     input  logic [4:0]  Rs1D, Rs2D,           // Source registers
+    input  logic        PredictTakenD,        // Branch predicted taken in Decode
 
     // Execute Stage Inputs
     input  logic [4:0]  Rs1E, Rs2E,           // Source registers
     input  logic [4:0]  RdE,                  // Destination register
-    input  logic        PCSrcE,               // Branch taken flag
+    input  logic        MispredictE,          // Branch mispredicted in Execute
     input  logic        ResultSrcE0,          // Load instruction flag
     input  logic        MulBusy,              // Multi-cycle multiply active flag
 
@@ -39,9 +40,10 @@ module hazard (
     assign StallF  = lwStall | MulBusy;
     assign StallD  = lwStall | MulBusy;
 
-    // flush when a branch is taken or a load introduces a bubble
-    assign FlushD  = PCSrcE;
-    assign FlushE  = lwStall | PCSrcE;
+    // Flush Decode if we mispredict in execute OR if we predict taken in decode
+    assign FlushD  = MispredictE | PredictTakenD;
+    // Flush Execute if there's a load stall OR if we mispredict in execute
+    assign FlushE  = lwStall | MispredictE;
 
     // forward to solve data hazards whenever possible
     always_comb begin

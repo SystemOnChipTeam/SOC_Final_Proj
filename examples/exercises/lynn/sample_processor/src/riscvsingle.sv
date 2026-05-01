@@ -23,9 +23,11 @@ module riscvsingle (
     // IFU to IEU
     logic [31:0] InstrD, PCD, PCPlus4D;
 
-    // IEU to IFU
-    logic        PCSrcE;
-    logic [31:0] PCTargetE;
+    // Branch Prediction Signals (Replaces PCSrcE and PCTargetE)
+    logic        PredictTakenD;
+    logic [31:0] PredictedTargetD;
+    logic        MispredictE;
+    logic [31:0] RecoveryPCE;
 
     // IEU to LSU (Execute stage)
     logic        MemEnE, RegWriteE, MemWriteE;
@@ -57,13 +59,16 @@ module riscvsingle (
     logic        RegWriteM;
     logic        MulWorking;
 
+
     ifu ifu(
         .clk, .reset,
         // Hazard unit
         .StallF, .StallD, .FlushD,
-        // From Execute stage
-        .PCSrcE,
-        .PCTargetE,
+        // Branch Prediction Interface
+        .PredictTakenD,
+        .PredictedTargetD,
+        .MispredictE,
+        .RecoveryPCE,
         // Outputs to Decode stage
         .InstrD, .PCD, .PCPlus4D,
         // Instruction memory interface
@@ -77,7 +82,7 @@ module riscvsingle (
         .InstrD, .PCD, .PCPlus4D,
         // Execute stage outputs
         .MemEnE, .RegWriteE, .MemWriteE,
-        .ALUResultE, .WriteDataE, .Funct3E, .PCTargetE,
+        .ALUResultE, .WriteDataE, .Funct3E,
         // Memory stage input (forwarding)
         .ALUResultM,
         // Writeback stage inputs
@@ -89,7 +94,11 @@ module riscvsingle (
         .StallE, .FlushE, .StallM, .FlushM, .StallW, .FlushW,
         .ForwardAE, .ForwardBE,
         .Rs1E, .Rs2E, .RdE,
-        .PCSrcE,
+        // Branch Prediction
+        .PredictTakenD,
+        .PredictedTargetD,
+        .MispredictE,
+        .RecoveryPCE,
         .ResultSrcE0,
         .MulWorking
     );
@@ -118,9 +127,10 @@ module riscvsingle (
         // Inputs
         // Decode stage
         .Rs1D, .Rs2D,
+        .PredictTakenD,
         // Execute stage
         .Rs1E, .Rs2E, .RdE,
-        .PCSrcE,
+        .MispredictE,
         .ResultSrcE0,
         .MulBusy(MulWorking),
         // Memory stage
